@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import java.lang.String?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.canvas.Canvas?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Pane?>
+<?import javafx.scene.layout.RowConstraints?>
+<?import javafx.scene.shape.Rectangle?>
+<?import javafx.scene.text.Font?>
+
+<fx:root fx:id="gridPane" prefHeight="300.0" prefWidth="600.0" stylesheets="@style.css" type="GridPane" xmlns="http://javafx.com/javafx/8.0.65" xmlns:fx="http://javafx.com/fxml/1">
+   <columnConstraints>
+      <ColumnConstraints hgrow="NEVER" maxWidth="1.7976931348623157E308" />
+      <ColumnConstraints hgrow="SOMETIMES" maxWidth="1.7976931348623157E308" minWidth="10.0" />
+   </columnConstraints>
+   <rowConstraints>
+      <RowConstraints maxHeight="1.7976931348623157E308" vgrow="NEVER" />
+      <RowConstraints vgrow="NEVER" />
+      <RowConstraints maxHeight="1.7976931348623157E308" vgrow="ALWAYS" />
+      <RowConstraints vgrow="NEVER" />
+      <RowConstraints vgrow="NEVER" />
+   </rowConstraints>
+   <children>
+      <ScrollPane fx:id="pane" hbarPolicy="NEVER" vbarPolicy="NEVER" GridPane.columnIndex="1" GridPane.rowIndex="2">
+         <content>
+            <Canvas fx:id="canvas" height="200.0" width="200.0" />
+         </content>
+      </ScrollPane>
+      <HBox fx:id="legendBoxBase" alignment="CENTER" spacing="5.0" GridPane.columnIndex="1" GridPane.rowIndex="4">
+         <children>
+            <HBox fx:id="legendBox">
+               <children>
+                  <CheckBox fx:id="cbData0" mnemonicParsing="false" selected="true" />
+                  <Label fx:id="txtData0" text="X">
+                     <graphic>
+                        <Pane prefHeight="10.0" prefWidth="10.0">
+                           <styleClass>
+                              <String fx:value="default-color0" />
+                              <String fx:value="chart-line-symbol" />
+                           </styleClass>
+                        </Pane>
+                     </graphic>
+                  </Label>
+                  <CheckBox fx:id="cbData1" mnemonicParsing="false" selected="true" />
+                  <Label fx:id="txtData1" text="Y">
+                     <graphic>
+                        <Pane prefHeight="10.0" prefWidth="10.0">
+                           <styleClass>
+                              <String fx:value="default-color1" />
+                              <String fx:value="chart-line-symbol" />
+                           </styleClass>
+                        </Pane>
+                     </graphic>
+                  </Label>
+                  <CheckBox fx:id="cbData2" mnemonicParsing="false" selected="true" />
+                  <Label fx:id="txtData2" text="Z">
+                     <graphic>
+                        <Pane prefHeight="10.0" prefWidth="10.0">
+                           <styleClass>
+                              <String fx:value="default-color2" />
+                              <String fx:value="chart-line-symbol" />
+                           </styleClass>
+                        </Pane>
+                     </graphic>
+                  </Label>
+               </children>
+            </HBox>
+            <CheckBox fx:id="cbAutoscale" mnemonicParsing="false" text="Auto-scale" />
+         </children>
+         <padding>
+            <Insets top="5.0" />
+         </padding>
+      </HBox>
+      <AnchorPane fx:id="yRuler" GridPane.rowIndex="2">
+         <GridPane.margin>
+            <Insets />
+         </GridPane.margin></AnchorPane>
+      <AnchorPane GridPane.columnIndex="1" GridPane.rowIndex="1" fx:id="xRuler">
+         <GridPane.margin>
+            <Insets />
+         </GridPane.margin></AnchorPane>
+      <AnchorPane fx:id="scrollBar" onMouseDragged="#scrollBar_onMouseDrag" onMousePressed="#scrollBar_onMousePressed" onMouseReleased="#scrollBar_onMouseReleased" GridPane.columnIndex="1" GridPane.rowIndex="3">
+         <children>
+            <Rectangle arcHeight="5.0" arcWidth="5.0" fill="GREY" height="9.0" stroke="BLACK" strokeType="INSIDE" strokeWidth="0.0" width="50.0" AnchorPane.bottomAnchor="3.0" AnchorPane.leftAnchor="0.0" AnchorPane.topAnchor="3.0" />
+         </children>
+      </AnchorPane>
+      <HBox fx:id="scaleBox" alignment="CENTER_LEFT" spacing="5.0" GridPane.columnIndex="1">
+         <children>
+            <Label text="Y Min" wrapText="true">
+               <font>
+                  <Font size="10.0" />
+               </font></Label>
+            <TextField fx:id="txtYMin" onAction="#onScaleSet" prefWidth="50.0" style="-fx-padding: 1;">
+               <font>
+                  <Font size="10.0" />
+               </font></TextField>
+            <Label text="Y Max" wrapText="true">
+               <font>
+                  <Font size="10.0" />
+               </font></Label>
+            <TextField fx:id="txtYMax" onAction="#onScaleSet" prefWidth="50.0" style="-fx-padding: 1;">
+               <font>
+                  <Font size="10.0" />
+               </font></TextField>
+            <Label text="Y Unit Tick" wrapText="true">
+               <font>
+                  <Font size="10.0" />
+               </font></Label>
+            <TextField fx:id="txtYUnitTick" onAction="#onScaleSet" prefWidth="50.0" style="-fx-padding: 1;">
+               <font>
+                  <Font size="10.0" />
+               </font></TextField>
+            <Label text="X Unit Tick" wrapText="true">
+               <font>
+                  <Font size="10.0" />
+               </font></Label>
+            <TextField fx:id="txtXUnitTick" onAction="#onScaleSet" prefWidth="50.0" style="-fx-padding: 1;">
+               <font>
+                  <Font size="10.0" />
+               </font></TextField>
+            <Label text="PX per Sec" wrapText="true">
+               <font>
+                  <Font size="10.0" />
+               </font></Label>
+            <TextField fx:id="txtWidthPerSec" onAction="#onScaleSet" prefWidth="50.0" style="-fx-padding: 1;">
+               <font>
+                  <Font size="10.0" />
+               </font></TextField>
+         </children>
+         <GridPane.margin>
+            <Insets />
+         </GridPane.margin>
+         <padding>
+            <Insets bottom="5.0" />
+         </padding>
+      </HBox>
+   </children>
+</fx:root>
