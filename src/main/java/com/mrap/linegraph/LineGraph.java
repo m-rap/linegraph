@@ -23,7 +23,7 @@
  */
 package com.mrap.linegraph;
 
-import com.mrap.common.FxRunnableManager;
+import com.mrap.common.FxScheduler;
 import com.mrap.common.MRunnable;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -48,7 +48,6 @@ import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javafx.application.Platform;
-import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -145,15 +144,12 @@ public class LineGraph extends GridPane {
 
         @Override
         public void onRun() {
-            long[] showStartEnd = new long[2];
-            ArrayDeque<float[]> toDraw = createToDraw(showStartEnd);
             if (isVisible() && getParent() != null) {
-                FxRunnableManager.checkAndRun(() -> {
+                FxScheduler.checkAndRun(() -> {
+                    long[] showStartEnd = new long[2];
+                    ArrayDeque<float[]> toDraw = createToDraw(showStartEnd);
                     display(toDraw, showStartEnd[0], showStartEnd[1]);
-                }, FxRunnableManager.RUNNABLE_PRIORITY_LOW);
-            } else {
-                int x;
-                x = 0;
+                }, FxScheduler.RUNNABLE_PRIORITY_LOW);
             }
             dump();
             try {

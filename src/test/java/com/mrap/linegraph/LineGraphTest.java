@@ -27,7 +27,7 @@ import javafx.stage.WindowEvent;
  */
 public class LineGraphTest extends Application {
     
-    LineGraph lineGraph, lineGraph2;
+    LineGraph lineGraph;
     RandomDataGenerator.RandomGenericGenerator randomGenerator = new RandomDataGenerator.RandomGenericGenerator(10);
     
     @Override
@@ -35,16 +35,14 @@ public class LineGraphTest extends Application {
         randomGenerator.listeners.add((RandomDataGenerator.RandomGeneratorListener<float[]>) (float[] result) -> {
             lineGraph.addData(System.currentTimeMillis(), result[0], result[1], result[2]);
         });
-        //lineGraph = new LineGraph(-0.1f, 0.1f, 1, 5, 100);
         lineGraph = new LineGraph(-5f, 5f, 1, 5, 100);
-        lineGraph2 = new LineGraph(-400f, 400f, 50, 5, 100);
         Button saveBtn = new Button("Save");
         Button loadBtn = new Button("Load");
         Button startBtn = new Button("Start");
         Button startOnceBtn = new Button("Start Once");
         Button stopBtn = new Button("Stop");
         HBox hbox = new HBox(startBtn, startOnceBtn, stopBtn, saveBtn, loadBtn);
-        VBox box = new VBox(lineGraph, lineGraph2, hbox);
+        VBox box = new VBox(lineGraph, hbox);
         AnchorPane pane = new AnchorPane(box);
         pane.setPrefWidth(600);
         pane.setPrefHeight(400);
@@ -97,8 +95,6 @@ public class LineGraphTest extends Application {
         });
         primaryStage.show();
         lineGraph.runnable.start();
-        lineGraph2.runnable.start();
-        //testRecording();
     }
     
     public static void main(String[] args) {
