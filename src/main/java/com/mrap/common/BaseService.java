@@ -23,6 +23,7 @@
  */
 package com.mrap.common;
 
+import java.util.concurrent.locks.LockSupport;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -30,23 +31,32 @@ import java.util.logging.Logger;
  *
  * @author software
  */
-public abstract class MRunnable implements Runnable {
+public abstract class BaseService implements Runnable {
     
-    static final int NONREALTIME_DELAY = 1000/30;
+    static final long NONREALTIME_DELAY = 1000/30;
     
     protected boolean running = false;
     protected Thread t = null;
+    private long prevSec = 0;
+    protected int fps = 0;
+    protected int frames = 0;
     
     public abstract void onStart() throws Exception;
     public abstract void onStop();
     public abstract void onRun();
     private final boolean realTime;
+    private long delay = NONREALTIME_DELAY;
     
-    public MRunnable(boolean realTime) {
+    public BaseService(boolean realTime) {
         this.realTime = realTime;
     }
     
-    public MRunnable() {
+    public BaseService(long delay) {
+        this.realTime = false;
+        this.delay = delay;
+    }
+    
+    public BaseService() {
         this(false);
     }
     
@@ -77,7 +87,7 @@ public abstract class MRunnable implements Runnable {
         try {
             t.join();
         } catch (InterruptedException ex) {
-            Logger.getLogger(MRunnable.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(BaseService.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
     
@@ -94,15 +104,23 @@ public abstract class MRunnable implements Runnable {
     @Override
     public void run() {
         while (running) {
+            long now = System.currentTimeMillis();
             onRun();
+            frames++;
+            if (now - prevSec > 1000) {
+                prevSec = now;
+                fps = frames;
+                frames = 0;
+            }
             try {
                 if (realTime) {
-                    Thread.sleep(1);
+                    //Thread.sleep(1);
+                    LockSupport.parkNanos(1);
                 } else {
-                    Thread.sleep(NONREALTIME_DELAY);
+                    Thread.sleep(delay);
                 }
             } catch (InterruptedException ex) {
-                Logger.getLogger(MRunnable.class.getName()).log(Level.INFO, null, ex);
+                Logger.getLogger(BaseService.class.getName()).log(Level.INFO, null, ex);
             }
         }
     }

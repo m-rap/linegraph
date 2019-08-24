@@ -24,6 +24,7 @@
 package com.mrap.common;
 
 import java.util.ArrayDeque;
+import java.util.concurrent.locks.LockSupport;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javafx.animation.AnimationTimer;
@@ -49,31 +50,47 @@ public class FxScheduler {
         @Override
         public void run() {
             r.run();
-            instance.fxRunnableReady = true;
+            instance.frames++;
+            synchronized (instance.waiter) {
+                instance.waiter.notifyAll();
+            }
         }
     }
     
     public static int RUNNABLE_PRIORITY_HIGH = 0;
     public static int RUNNABLE_PRIORITY_LOW = 1;
     
+    private Thread t;
+    boolean running = false;
+    
     private FxRunnable toRun = null;
     private int currPrio = RUNNABLE_PRIORITY_HIGH;
-    private boolean fxRunnableReady = true;
     private final ArrayDeque<FxRunnable>[] fxRunnables = new ArrayDeque[] {
         new ArrayDeque<>(),
         new ArrayDeque<>()
     };
-    boolean prevIsEmpty;
-    long emptyMs;
+    private boolean prevIsEmpty = true;
+    private long emptyMs = System.currentTimeMillis();
+    private long prevSec = 0;
+    private int frames = 0;
+    
+    private final Object waiter = new Object();
+    
+    private final static FxScheduler instance = new FxScheduler();
     
     AnimationTimer timer = new AnimationTimer() {
         @Override
         public void handle(long now) {
-            if (!fxRunnableReady) {
-                return;
-            }
             if (!render())
                 timer.stop();
+        }
+    };
+    
+    Runnable loop = () -> {
+        boolean next = true;
+        while (next) {
+            next = render();
+            LockSupport.parkNanos(1);
         }
     };
     
@@ -81,50 +98,49 @@ public class FxScheduler {
         
     }
     
-    private void start() {
-        prevIsEmpty = true;
-        emptyMs = System.currentTimeMillis();
-        timer.start();
-        //t.start();
+    void start() {
+        synchronized (fxRunnables) {
+            if (running)
+                return;
+            running = true;
+            t = new Thread(loop);
+            t.start();
+            //timer.start();
+        }
     }
     
     private boolean isFrameEmpty() {
         return fxRunnables[0].isEmpty() && fxRunnables[1].isEmpty();
     }
-    
-    private Thread t = new Thread(() -> {
-        boolean next = true;
-        while (next) {
-            if (!fxRunnableReady) {
-                continue;
-            }
-            next = render();
-        }
-    });
 
     private boolean render() {
-        synchronized (fxRunnables) {
-            boolean isEmpty = isFrameEmpty();
-            if (isEmpty != prevIsEmpty) {
+        long ts = System.currentTimeMillis();
+        boolean isEmpty = isFrameEmpty();
+        if (isEmpty) {
+            if (!prevIsEmpty) {
                 emptyMs = System.currentTimeMillis();
             } else {
                 if (System.currentTimeMillis() - emptyMs > 3000) {
-                    instance = null;
+                    running = false;
+                    prevIsEmpty = true;
+                    t = null;
+                    //timer.stop();
                     System.out.println("empty frames timeout");
                     return false;
                 }
             }
-            prevIsEmpty = isEmpty;
-            
-            toRun = null;
+        }
+        prevIsEmpty = isEmpty;
+        toRun = null;
+        
+        synchronized (fxRunnables) {
             for (currPrio = RUNNABLE_PRIORITY_HIGH; currPrio < fxRunnables.length; currPrio++) {
                 ArrayDeque<FxRunnable> rs = fxRunnables[currPrio];
                 if (rs.size() > 0) {
                     toRun = rs.pop();
                     if (currPrio == RUNNABLE_PRIORITY_LOW) {
-                        long ts = System.currentTimeMillis();
                         if (ts - toRun.ts > 1000) {
-                            System.out.println("Clearing old frames");
+                            System.out.println("Clearing old frames " + fxRunnables[currPrio].size());
                             fxRunnables[currPrio].clear();
                         }
                     }
@@ -133,33 +149,33 @@ public class FxScheduler {
             }
         }
         if (toRun != null) {
-            //if (toRun.priority == 0)
-            fxRunnableReady = false;
             checkAndRunInternal(toRun);
+        }
+        if (ts - prevSec > 1000) {
+            //System.out.println("fps " + frames);
+            prevSec = ts;
+            frames = 0;
         }
         return true;
     }
     
-    private static FxScheduler instance = null;
-    
     private void checkAndRunInternal(FxRunnable r) {
-        try {
-            if (!Platform.isFxApplicationThread())
-                Platform.runLater(r);
-            else
-                r.run();
-            Thread.sleep(1);
-        } catch (InterruptedException ex) {
-            Logger.getLogger(FxScheduler.class.getName()).log(Level.SEVERE, null, ex);
+        if (!Platform.isFxApplicationThread()) {
+            Platform.runLater(r);
+            try {
+                synchronized (waiter) {
+                    waiter.wait(100);
+                }
+            } catch (InterruptedException ex) {
+                Logger.getLogger(FxScheduler.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        } else {
+            r.run();
         }
     }
     
     public static void checkAndRun(Runnable r, int priority) {
-        if (instance == null) {
-            instance = new FxScheduler();
-            //instance.t.start();
-            instance.start();
-        }
+        instance.start();
         synchronized (instance.fxRunnables) {
             instance.fxRunnables[priority].add(new FxRunnable(r, priority,
                     System.currentTimeMillis()));

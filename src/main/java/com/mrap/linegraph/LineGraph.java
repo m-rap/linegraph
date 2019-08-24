@@ -24,7 +24,7 @@
 package com.mrap.linegraph;
 
 import com.mrap.common.FxScheduler;
-import com.mrap.common.MRunnable;
+import com.mrap.common.BaseService;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -126,7 +126,7 @@ public class LineGraph extends GridPane {
     @FXML
     Label txtData2;
 
-    public MRunnable runnable = new MRunnable() {
+    public BaseService runnable = new BaseService(1000/120) {
         @Override
         public String getName() {
             return "LineGraph runnable";
@@ -152,11 +152,11 @@ public class LineGraph extends GridPane {
                 }, FxScheduler.RUNNABLE_PRIORITY_LOW);
             }
             dump();
-            try {
-                Thread.sleep((long) delay - 1);
-            } catch (InterruptedException ex) {
-                Logger.getLogger(LineGraph.class.getName()).log(Level.SEVERE, null, ex);
-            }
+            //try {
+            //    Thread.sleep((long) delay - 1);
+            //} catch (InterruptedException ex) {
+            //    Logger.getLogger(LineGraph.class.getName()).log(Level.SEVERE, null, ex);
+            //}
             //FutureTask f = new FutureTask(new Callable() {
             //    @Override
             //    public Object call() throws Exception {
@@ -188,7 +188,7 @@ public class LineGraph extends GridPane {
                 t.interrupt();
                 t.join();
             } catch (InterruptedException ex) {
-                Logger.getLogger(MRunnable.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(BaseService.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
     };

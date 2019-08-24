@@ -9,6 +9,7 @@ import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.util.ArrayDeque;
 import java.util.Random;
+import java.util.concurrent.locks.LockSupport;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -18,7 +19,7 @@ import java.util.logging.Logger;
  * @author m_rap
  * @param <T>
  */
-public abstract class RandomDataGenerator<T> extends MRunnable {
+public abstract class RandomDataGenerator<T> extends BaseService {
     
     public interface RandomGeneratorListener<T> {
         void onNextRandom(T data);
@@ -76,13 +77,13 @@ public abstract class RandomDataGenerator<T> extends MRunnable {
 
     final Random r;
     public ArrayDeque<RandomGeneratorListener<T>> listeners = new ArrayDeque<>();
-    public int delay;
+    public double delay;
     
     public RandomDataGenerator(int freq) {
         super(true);
         r = new Random();
         int f = freq > 0 ? freq : 1;
-        delay = 1000/f - 1;
+        delay = 1000.0/f;
         if (delay < 0)
             delay = 0;
     }
@@ -90,7 +91,7 @@ public abstract class RandomDataGenerator<T> extends MRunnable {
     protected abstract T nextRandom();
     
     public void nextMsRandoms(long ms, Consumer<T> consumer) {
-        long count = ms / (delay + 1);
+        long count = (long)((double)ms / delay);
         for (int i = 0; i < count; i++) {
             consumer.accept(nextRandom());
         }
@@ -132,10 +133,6 @@ public abstract class RandomDataGenerator<T> extends MRunnable {
     public void onRun() {
         for (RandomGeneratorListener<T> l : listeners)
             l.onNextRandom(nextRandom());
-        try {
-            Thread.sleep(delay);
-        } catch (InterruptedException ex) {
-            Logger.getLogger(RandomDataGenerator.class.getName()).log(Level.SEVERE, null, ex);
-        }
+        LockSupport.parkNanos((long)(delay * 1000000));
     }
 }
