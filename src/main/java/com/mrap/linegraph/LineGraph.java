@@ -126,7 +126,7 @@ public class LineGraph extends GridPane {
     @FXML
     Label txtData2;
 
-    public BaseService runnable = new BaseService(1000/120) {
+    public BaseService runnable = new BaseService(120) {
         @Override
         public String getName() {
             return "LineGraph runnable";

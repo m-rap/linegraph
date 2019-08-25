@@ -33,25 +33,26 @@ import java.util.logging.Logger;
  */
 public abstract class BaseService implements Runnable {
     
-    static final long NONREALTIME_DELAY = 1000/30;
+    static final int DEFAULT_TARGETFPS = 60;
     
     protected boolean running = false;
     protected Thread t = null;
-    private long prevSec = 0;
+    protected long prevSec = 0;
     protected int framesPerSecond = 0;
     protected int frames = 0;
+    public double targetFps = DEFAULT_TARGETFPS;
     
     public abstract void onStart() throws Exception;
     public abstract void onStop();
     public abstract void onRun();
-    private long delay;
+    private double delay;
     
     public BaseService(boolean realTime) {
-        this(realTime ? 0 : NONREALTIME_DELAY);
+        this(realTime ? 0.0 : DEFAULT_TARGETFPS);
     }
     
-    public BaseService(long delay) {
-        this.delay = delay;
+    public BaseService(double fps) {
+        targetFps = fps;
     }
     
     public BaseService() {
@@ -105,20 +106,29 @@ public abstract class BaseService implements Runnable {
             long now = System.currentTimeMillis();
             onRun();
             frames++;
+            now = System.currentTimeMillis();
             if (now - prevSec > 1000) {
                 prevSec = now;
                 framesPerSecond = frames;
                 frames = 0;
             }
-            try {
-                if (delay == 0) {
-                    //Thread.sleep(1);
+            if (targetFps == 0.0) {
+                //Thread.sleep(1);
+                LockSupport.parkNanos(1);
+            } else {
+                //Thread.sleep(delay);
+                double remainTargetFrames = targetFps - frames;
+                double remainMs = (prevSec + 1000) - now;
+                if (remainTargetFrames == 0 || remainMs <= 0) {
                     LockSupport.parkNanos(1);
                 } else {
-                    Thread.sleep(delay);
+                    if (remainTargetFrames > 0) {
+                        delay = remainMs / remainTargetFrames;
+                    } else if (remainTargetFrames < 0) {
+                        delay = now - prevSec;
+                    }
+                    LockSupport.parkNanos((long)(delay * 1000000));
                 }
-            } catch (InterruptedException ex) {
-                Logger.getLogger(BaseService.class.getName()).log(Level.INFO, null, ex);
             }
         }
     }

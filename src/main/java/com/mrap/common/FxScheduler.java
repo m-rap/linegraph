@@ -129,7 +129,9 @@ public class FxScheduler {
                 Field f = (Field)arr[1];
                 try {
                     f.setAccessible(true);
-                    sb.append("\n").append(o.getClass().getSimpleName()).append(".").
+                    String name = o.getClass().getName();
+                    name = name.substring(name.lastIndexOf(".") + 1);
+                    sb.append("\n").append(name).append(".").
                             append(f.getName()).append(": ").append(f.get(o));
                 } catch (IllegalArgumentException | IllegalAccessException ex) {
                     Logger.getLogger(FxScheduler.class.getName()).log(Level.SEVERE, null, ex);
@@ -146,7 +148,7 @@ public class FxScheduler {
             if (!prevIsEmpty) {
                 emptyMs = System.currentTimeMillis();
             } else {
-                if (System.currentTimeMillis() - emptyMs > 3000) {
+                if (System.currentTimeMillis() - emptyMs > 500) {
                     running = false;
                     prevIsEmpty = true;
                     t = null;
