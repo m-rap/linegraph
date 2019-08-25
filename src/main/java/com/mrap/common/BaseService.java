@@ -38,21 +38,19 @@ public abstract class BaseService implements Runnable {
     protected boolean running = false;
     protected Thread t = null;
     private long prevSec = 0;
-    protected int fps = 0;
+    protected int framesPerSecond = 0;
     protected int frames = 0;
     
     public abstract void onStart() throws Exception;
     public abstract void onStop();
     public abstract void onRun();
-    private final boolean realTime;
-    private long delay = NONREALTIME_DELAY;
+    private long delay;
     
     public BaseService(boolean realTime) {
-        this.realTime = realTime;
+        this(realTime ? 0 : NONREALTIME_DELAY);
     }
     
     public BaseService(long delay) {
-        this.realTime = false;
         this.delay = delay;
     }
     
@@ -109,11 +107,11 @@ public abstract class BaseService implements Runnable {
             frames++;
             if (now - prevSec > 1000) {
                 prevSec = now;
-                fps = frames;
+                framesPerSecond = frames;
                 frames = 0;
             }
             try {
-                if (realTime) {
+                if (delay == 0) {
                     //Thread.sleep(1);
                     LockSupport.parkNanos(1);
                 } else {

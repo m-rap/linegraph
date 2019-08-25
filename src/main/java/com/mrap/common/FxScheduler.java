@@ -23,12 +23,14 @@
  */
 package com.mrap.common;
 
+import java.lang.reflect.Field;
 import java.util.ArrayDeque;
 import java.util.concurrent.locks.LockSupport;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javafx.animation.AnimationTimer;
 import javafx.application.Platform;
+import javafx.scene.control.Label;
 
 /**
  *
@@ -73,8 +75,12 @@ public class FxScheduler {
     private long emptyMs = System.currentTimeMillis();
     private long prevSec = 0;
     private int frames = 0;
+    private int fps = 0;
     
     private final Object waiter = new Object();
+    
+    public Label DEBUG_LABEL = new Label();
+    public ArrayDeque<Object[]> trackedFields = new ArrayDeque<>();
     
     private final static FxScheduler instance = new FxScheduler();
     
@@ -95,7 +101,7 @@ public class FxScheduler {
     };
     
     private FxScheduler() {
-        
+        //DEBUG_LABEL.mul
     }
     
     void start() {
@@ -111,6 +117,26 @@ public class FxScheduler {
     
     private boolean isFrameEmpty() {
         return fxRunnables[0].isEmpty() && fxRunnables[1].isEmpty();
+    }
+    
+    private void renderDebug() {
+        if (DEBUG_LABEL.getParent() == null || !DEBUG_LABEL.isVisible())
+            return;
+        checkAndRunInternal(new FxRunnable(() -> {
+            StringBuilder sb = new StringBuilder("Log:");
+            for (Object[] arr : trackedFields) {
+                Object o = arr[0];
+                Field f = (Field)arr[1];
+                try {
+                    f.setAccessible(true);
+                    sb.append("\n").append(o.getClass().getSimpleName()).append(".").
+                            append(f.getName()).append(": ").append(f.get(o));
+                } catch (IllegalArgumentException | IllegalAccessException ex) {
+                    Logger.getLogger(FxScheduler.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+            DEBUG_LABEL.setText(sb.toString());
+        }, RUNNABLE_PRIORITY_HIGH, System.currentTimeMillis()));
     }
 
     private boolean render() {
@@ -150,10 +176,12 @@ public class FxScheduler {
         }
         if (toRun != null) {
             checkAndRunInternal(toRun);
+            renderDebug();
         }
         if (ts - prevSec > 1000) {
             //System.out.println("fps " + frames);
             prevSec = ts;
+            fps = frames;
             frames = 0;
         }
         return true;
@@ -172,6 +200,10 @@ public class FxScheduler {
         } else {
             r.run();
         }
+    }
+    
+    public static FxScheduler instance() {
+        return instance;
     }
     
     public static void checkAndRun(Runnable r, int priority) {

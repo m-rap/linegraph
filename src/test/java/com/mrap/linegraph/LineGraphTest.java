@@ -5,7 +5,9 @@
  */
 package com.mrap.linegraph;
 
+import com.mrap.common.FxScheduler;
 import com.mrap.common.RandomDataGenerator;
+import java.lang.reflect.Field;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.logging.Level;
@@ -37,9 +39,18 @@ public class LineGraphTest extends Application {
             for (LineGraph l : lineGraphs)
                 l.addData(System.currentTimeMillis(), result[0], result[1], result[2]);
         });
+        
+        Field tmp = searchField(FxScheduler.instance(), "fps");
+        if (tmp != null)
+            FxScheduler.instance().trackedFields.add(new Object[]{FxScheduler.instance(), tmp});
+        
         lineGraphs = new LineGraph[lineGraphCount];
-        for (int i = 0; i < lineGraphCount; i++)
+        for (int i = 0; i < lineGraphCount; i++) {
             lineGraphs[i] = new LineGraph(-5f, 5f, 1, 5, 100);
+            tmp = searchField(lineGraphs[i].runnable, "framesPerSecond");
+            if (tmp != null)
+                FxScheduler.instance().trackedFields.add(new Object[]{lineGraphs[i].runnable, tmp});
+        }
         Button saveBtn = new Button("Save");
         Button loadBtn = new Button("Load");
         Button startBtn = new Button("Start");
@@ -51,13 +62,14 @@ public class LineGraphTest extends Application {
             box.getChildren().add(l);
         }
         box.getChildren().add(hbox);
-        AnchorPane pane = new AnchorPane(box);
-        pane.setPrefWidth(600);
-        pane.setPrefHeight(lineGraphCount * 200);
-        AnchorPane.setTopAnchor(box, 0.0);
-        AnchorPane.setRightAnchor(box, 0.0);
-        AnchorPane.setBottomAnchor(box, 0.0);
-        AnchorPane.setLeftAnchor(box, 0.0);
+        box.getChildren().add(FxScheduler.instance().DEBUG_LABEL);
+        //AnchorPane pane = new AnchorPane(box);
+        //pane.setPrefWidth(600);
+        ////pane.setPrefHeight(lineGraphCount * 200 + 50);
+        //AnchorPane.setTopAnchor(box, 0.0);
+        //AnchorPane.setRightAnchor(box, 0.0);
+        //AnchorPane.setBottomAnchor(box, 0.0);
+        //AnchorPane.setLeftAnchor(box, 0.0);
         
         saveBtn.setOnAction((ActionEvent event) -> {
             SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy-HHmmss");
@@ -97,7 +109,8 @@ public class LineGraphTest extends Application {
             randomGenerator.stop();
         });
         
-        primaryStage.setScene(new Scene(pane));
+        //primaryStage.setScene(new Scene(pane));
+        primaryStage.setScene(new Scene(box));
         primaryStage.setOnCloseRequest((WindowEvent event) -> {
             randomGenerator.stop();
             for (LineGraph l : lineGraphs)
@@ -106,6 +119,17 @@ public class LineGraphTest extends Application {
         primaryStage.show();
         for (LineGraph l : lineGraphs)
             l.runnable.start();
+    }
+
+    private Field searchField(Object o, String name) throws SecurityException {
+        for (Class c = o.getClass(); c != null; c = c.getSuperclass()) {
+            for (Field f : c.getDeclaredFields()) {
+                if (f.getName().equals(name)) {
+                    return f;
+                }
+            }
+        }
+        return null;
     }
     
     public static void main(String[] args) {
