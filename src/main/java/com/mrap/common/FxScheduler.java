@@ -25,10 +25,8 @@ package com.mrap.common;
 
 import java.lang.reflect.Field;
 import java.util.ArrayDeque;
-import java.util.concurrent.locks.LockSupport;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javafx.animation.AnimationTimer;
 import javafx.application.Platform;
 import javafx.scene.control.Label;
 
@@ -36,7 +34,22 @@ import javafx.scene.control.Label;
  *
  * @author software
  */
-public class FxScheduler {
+public class FxScheduler extends BaseService {
+
+    @Override
+    public void onStart() throws Exception {
+        
+    }
+
+    @Override
+    public void onStop() {
+        
+    }
+
+    @Override
+    public void onRun() {
+        render();
+    }
 
     private static class FxRunnable implements Runnable {
         private final Runnable r;
@@ -62,9 +75,6 @@ public class FxScheduler {
     public static int RUNNABLE_PRIORITY_HIGH = 0;
     public static int RUNNABLE_PRIORITY_LOW = 1;
     
-    private Thread t;
-    boolean running = false;
-    
     private FxRunnable toRun = null;
     private int currPrio = RUNNABLE_PRIORITY_HIGH;
     private final ArrayDeque<FxRunnable>[] fxRunnables = new ArrayDeque[] {
@@ -73,9 +83,6 @@ public class FxScheduler {
     };
     private boolean prevIsEmpty = true;
     private long emptyMs = System.currentTimeMillis();
-    private long prevSec = 0;
-    private int frames = 0;
-    private int fps = 0;
     
     private final Object waiter = new Object();
     
@@ -84,35 +91,9 @@ public class FxScheduler {
     
     private final static FxScheduler instance = new FxScheduler();
     
-    AnimationTimer timer = new AnimationTimer() {
-        @Override
-        public void handle(long now) {
-            if (!render())
-                timer.stop();
-        }
-    };
-    
-    Runnable loop = () -> {
-        boolean next = true;
-        while (next) {
-            next = render();
-            LockSupport.parkNanos(1);
-        }
-    };
-    
     private FxScheduler() {
-        //DEBUG_LABEL.mul
-    }
-    
-    void start() {
-        synchronized (fxRunnables) {
-            if (running)
-                return;
-            running = true;
-            t = new Thread(loop);
-            t.start();
-            //timer.start();
-        }
+        super(true);
+        overrideFrameCount = true;
     }
     
     private boolean isFrameEmpty() {
@@ -149,10 +130,8 @@ public class FxScheduler {
                 emptyMs = System.currentTimeMillis();
             } else {
                 if (System.currentTimeMillis() - emptyMs > 500) {
-                    running = false;
                     prevIsEmpty = true;
-                    t = null;
-                    //timer.stop();
+                    stop();
                     System.out.println("empty frames timeout");
                     return false;
                 }
@@ -180,12 +159,6 @@ public class FxScheduler {
             checkAndRunInternal(toRun);
             renderDebug();
         }
-        if (ts - prevSec > 1000) {
-            //System.out.println("fps " + frames);
-            prevSec = ts;
-            fps = frames;
-            frames = 0;
-        }
         return true;
     }
     
@@ -209,10 +182,14 @@ public class FxScheduler {
     }
     
     public static void checkAndRun(Runnable r, int priority) {
-        instance.start();
-        synchronized (instance.fxRunnables) {
-            instance.fxRunnables[priority].add(new FxRunnable(r, priority,
-                    System.currentTimeMillis()));
+        try {
+            instance.start();
+            synchronized (instance.fxRunnables) {
+                instance.fxRunnables[priority].add(new FxRunnable(r, priority,
+                        System.currentTimeMillis()));
+            }
+        } catch (Exception ex) {
+            Logger.getLogger(FxScheduler.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
     

@@ -42,7 +42,7 @@ public class LineGraphTest extends Application {
                 l.addData(System.currentTimeMillis(), result[0], result[1], result[2]);
         });
         
-        Field tmp = searchField(FxScheduler.instance(), "fps");
+        Field tmp = searchField(FxScheduler.instance(), "framesPerSecond");
         if (tmp != null)
             FxScheduler.instance().trackedFields.add(new Object[] {FxScheduler.instance(), tmp});
         

@@ -34,6 +34,7 @@ import java.util.logging.Logger;
 public abstract class BaseService implements Runnable {
     
     static final int DEFAULT_TARGETFPS = 60;
+    static final int REST_SEC = 5;
     
     protected boolean running = false;
     protected Thread t = null;
@@ -41,11 +42,16 @@ public abstract class BaseService implements Runnable {
     protected int framesPerSecond = 0;
     protected int frames = 0;
     public double targetFps = DEFAULT_TARGETFPS;
+    protected boolean overrideFrameCount = false;
     
     public abstract void onStart() throws Exception;
     public abstract void onStop();
     public abstract void onRun();
     private double delay;
+    
+    private long rest = 0;
+    
+    private static final Object LOCK = new Object();
     
     public BaseService(boolean realTime) {
         this(realTime ? 0.0 : DEFAULT_TARGETFPS);
@@ -64,18 +70,20 @@ public abstract class BaseService implements Runnable {
     }
     
     public void start() throws Exception {
-        if (running)
-            return;
-        
-        try {
-            running = true;
-            t = new Thread(this, getName());
-            onStart();
-            t.start();
-        } catch (Exception ex) {
-            running = false;
-            t = null;
-            throw ex;
+        synchronized (LOCK) {
+            if (running)
+                return;
+
+            try {
+                running = true;
+                t = new Thread(this, getName());
+                onStart();
+                t.start();
+            } catch (Exception ex) {
+                running = false;
+                t = null;
+                throw ex;
+            }
         }
     }
     
@@ -91,13 +99,21 @@ public abstract class BaseService implements Runnable {
     }
     
     public void stop() {
-        if (!running)
-            return;
-        
-        running = false;
-        onStop();
-        join();
-        t = null;
+        synchronized (LOCK) {
+            if (!running)
+                return;
+
+            running = false;
+            onStop();
+            if (t.getId() != Thread.currentThread().getId())
+                join();
+            t = null;
+        }
+    }
+    
+    protected void busySleep(long delay) {
+        long start = System.nanoTime();
+        while (System.nanoTime() < start + delay);
     }
     
     @Override
@@ -105,29 +121,45 @@ public abstract class BaseService implements Runnable {
         while (running) {
             long now = System.currentTimeMillis();
             onRun();
-            frames++;
-            now = System.currentTimeMillis();
+            if (!overrideFrameCount)
+                frames++;
             if (now - prevSec > 1000) {
                 prevSec = now;
                 framesPerSecond = frames;
                 frames = 0;
+                rest++;
+                if (rest > REST_SEC) {
+                    rest = 0;
+                    try {
+                        Thread.sleep(10);
+                    } catch (InterruptedException ex) {
+                        Logger.getLogger(BaseService.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                }
             }
-            if (targetFps == 0.0) {
-                //Thread.sleep(1);
-                LockSupport.parkNanos(1);
-            } else {
-                //Thread.sleep(delay);
+            now = System.currentTimeMillis();
+            if (targetFps > 0.0) {
                 double remainTargetFrames = targetFps - frames;
                 double remainMs = (prevSec + 1000) - now;
-                if (remainTargetFrames == 0 || remainMs <= 0) {
-                    LockSupport.parkNanos(1);
-                } else {
-                    if (remainTargetFrames > 0) {
+                if (remainMs > 0.0) {
+                    if (remainTargetFrames > 0.0) {
                         delay = remainMs / remainTargetFrames;
-                    } else if (remainTargetFrames < 0) {
-                        delay = now - prevSec;
+                    } else {
+                        if (remainTargetFrames < 0.0) {
+                            delay = now - prevSec;
+                        } else {
+                            delay = remainMs;
+                        }
                     }
-                    LockSupport.parkNanos((long)(delay * 1000000));
+                }
+                if (delay < 1.0) {
+                    busySleep((long)(delay * 1000000));
+                } else {
+                    try {
+                        Thread.sleep((long) delay);
+                    } catch (InterruptedException ex) {
+                        Logger.getLogger(BaseService.class.getName()).log(Level.SEVERE, null, ex);
+                    }
                 }
             }
         }
