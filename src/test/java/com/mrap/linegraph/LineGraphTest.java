@@ -71,7 +71,7 @@ public class LineGraphTest extends Application {
         box.getChildren().add(new HBox(FxScheduler.instance().DEBUG_LABEL));
         AnchorPane pane = new AnchorPane(box);
         pane.setPrefWidth(600);
-        //pane.setPrefHeight(lineGraphCount * 200 + 50);
+        pane.setPrefHeight(lineGraphCount * 200 + 50);
         AnchorPane.setTopAnchor(box, 0.0);
         AnchorPane.setRightAnchor(box, 0.0);
         AnchorPane.setBottomAnchor(box, 0.0);

@@ -211,8 +211,6 @@ public class LineGraph extends GridPane {
     float autoYMin, autoYMax;
     private final ArrayList<Object[]> data = new ArrayList<>();
     long last;
-    float fps;
-    float delay;
     GraphicsContext gc;
     private double lineWidth;
     private Paint[] colors;
@@ -330,9 +328,6 @@ public class LineGraph extends GridPane {
         setDefaultStyle();
 
         setScale(yMin1, yMax1, yUnitTick1, xUnitTick1, widthPerSec1);
-
-        fps = 30;
-        delay = 1000 / fps;
 
         pane.heightProperty().addListener((ObservableValue<? extends Number> observable, Number oldValue, Number newValue) -> {
             double height1 = newValue.doubleValue();

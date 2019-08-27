@@ -23,7 +23,6 @@
  */
 package com.mrap.common;
 
-import java.util.concurrent.locks.LockSupport;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -104,6 +103,8 @@ public abstract class BaseService implements Runnable {
                 return;
 
             running = false;
+            frames = 0;
+            framesPerSecond = 0;
             onStop();
             if (t.getId() != Thread.currentThread().getId())
                 join();

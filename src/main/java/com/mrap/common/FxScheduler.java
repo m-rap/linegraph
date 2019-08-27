@@ -29,6 +29,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javafx.application.Platform;
 import javafx.scene.control.Label;
+import javafx.scene.layout.Region;
 
 /**
  *
@@ -36,29 +37,12 @@ import javafx.scene.control.Label;
  */
 public class FxScheduler extends BaseService {
 
-    @Override
-    public void onStart() throws Exception {
-        
-    }
-
-    @Override
-    public void onStop() {
-        
-    }
-
-    @Override
-    public void onRun() {
-        render();
-    }
-
     private static class FxRunnable implements Runnable {
         private final Runnable r;
-        public final int priority;
         public final long ts;
         
-        public FxRunnable(Runnable r, int priority, long ts) {
+        public FxRunnable(Runnable r, long ts) {
             this.r = r;
-            this.priority = priority;
             this.ts = ts;
         }
         
@@ -66,6 +50,7 @@ public class FxScheduler extends BaseService {
         public void run() {
             r.run();
             instance.frames++;
+            instance.renderDebug();
             synchronized (instance.waiter) {
                 instance.waiter.notifyAll();
             }
@@ -94,6 +79,7 @@ public class FxScheduler extends BaseService {
     private FxScheduler() {
         super(true);
         overrideFrameCount = true;
+        DEBUG_LABEL.setMinHeight(Region.USE_PREF_SIZE);
     }
     
     private boolean isFrameEmpty() {
@@ -103,23 +89,21 @@ public class FxScheduler extends BaseService {
     private void renderDebug() {
         if (DEBUG_LABEL.getParent() == null || !DEBUG_LABEL.isVisible())
             return;
-        checkAndRunInternal(new FxRunnable(() -> {
-            StringBuilder sb = new StringBuilder("Log:");
-            for (Object[] arr : trackedFields) {
-                Object o = arr[0];
-                Field f = (Field)arr[1];
-                try {
-                    f.setAccessible(true);
-                    String name = o.getClass().getName();
-                    name = name.substring(name.lastIndexOf(".") + 1);
-                    sb.append("\n").append(name).append(".").
-                            append(f.getName()).append(": ").append(f.get(o));
-                } catch (IllegalArgumentException | IllegalAccessException ex) {
-                    Logger.getLogger(FxScheduler.class.getName()).log(Level.SEVERE, null, ex);
-                }
+        StringBuilder sb = new StringBuilder("Log:");
+        for (Object[] arr : trackedFields) {
+            Object o = arr[0];
+            Field f = (Field)arr[1];
+            try {
+                f.setAccessible(true);
+                String name = o.getClass().getName();
+                name = name.substring(name.lastIndexOf(".") + 1);
+                sb.append("\n").append(name).append(".").
+                        append(f.getName()).append(": ").append(f.get(o));
+            } catch (IllegalArgumentException | IllegalAccessException ex) {
+                Logger.getLogger(FxScheduler.class.getName()).log(Level.SEVERE, null, ex);
             }
-            DEBUG_LABEL.setText(sb.toString());
-        }, RUNNABLE_PRIORITY_HIGH, System.currentTimeMillis()));
+        }
+        DEBUG_LABEL.setText(sb.toString());
     }
 
     private boolean render() {
@@ -157,7 +141,6 @@ public class FxScheduler extends BaseService {
         }
         if (toRun != null) {
             checkAndRunInternal(toRun);
-            renderDebug();
         }
         return true;
     }
@@ -177,6 +160,21 @@ public class FxScheduler extends BaseService {
         }
     }
     
+    @Override
+    public void onStart() throws Exception {
+        
+    }
+
+    @Override
+    public void onStop() {
+        
+    }
+
+    @Override
+    public void onRun() {
+        render();
+    }
+    
     public static FxScheduler instance() {
         return instance;
     }
@@ -185,8 +183,7 @@ public class FxScheduler extends BaseService {
         try {
             instance.start();
             synchronized (instance.fxRunnables) {
-                instance.fxRunnables[priority].add(new FxRunnable(r, priority,
-                        System.currentTimeMillis()));
+                instance.fxRunnables[priority].add(new FxRunnable(r, System.currentTimeMillis()));
             }
         } catch (Exception ex) {
             Logger.getLogger(FxScheduler.class.getName()).log(Level.SEVERE, null, ex);
