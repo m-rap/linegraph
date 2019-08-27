@@ -42,6 +42,7 @@ public abstract class BaseService implements Runnable {
     protected int frames = 0;
     public double targetFps = DEFAULT_TARGETFPS;
     protected boolean overrideFrameCount = false;
+    protected long startMs = 0;
     
     public abstract void onStart() throws Exception;
     public abstract void onStop();
@@ -76,6 +77,8 @@ public abstract class BaseService implements Runnable {
             try {
                 running = true;
                 t = new Thread(this, getName());
+                startMs = System.currentTimeMillis();
+                prevSec = 0;
                 onStart();
                 t.start();
             } catch (Exception ex) {
@@ -124,8 +127,9 @@ public abstract class BaseService implements Runnable {
             onRun();
             if (!overrideFrameCount)
                 frames++;
-            if (now - prevSec > 1000) {
-                prevSec = now;
+            long currSec = (now - startMs) / 1000;
+            if (currSec > prevSec) {
+                prevSec = currSec;
                 framesPerSecond = frames;
                 frames = 0;
                 rest++;
@@ -138,28 +142,27 @@ public abstract class BaseService implements Runnable {
                     }
                 }
             }
-            now = System.currentTimeMillis();
             if (targetFps > 0.0) {
+                now = System.currentTimeMillis();
                 double remainTargetFrames = targetFps - frames;
-                double remainMs = (prevSec + 1000) - now;
+                double remainMs = (prevSec + 1) * 1000 + startMs - now;
+                delay = 0.0;
                 if (remainMs > 0.0) {
                     if (remainTargetFrames > 0.0) {
                         delay = remainMs / remainTargetFrames;
                     } else {
-                        if (remainTargetFrames < 0.0) {
-                            delay = now - prevSec;
-                        } else {
-                            delay = remainMs;
-                        }
+                        delay = remainMs;
                     }
                 }
-                if (delay < 1.0) {
-                    busySleep((long)(delay * 1000000));
-                } else {
-                    try {
-                        Thread.sleep((long) delay);
-                    } catch (InterruptedException ex) {
-                        Logger.getLogger(BaseService.class.getName()).log(Level.SEVERE, null, ex);
+                if (delay > 0.0) {
+                    if (delay < 1.0) {
+                        busySleep((long)(0.8 * delay * 1000000));
+                    } else {
+                        try {
+                            Thread.sleep((long) delay);
+                        } catch (InterruptedException ex) {
+                            Logger.getLogger(BaseService.class.getName()).log(Level.SEVERE, null, ex);
+                        }
                     }
                 }
             }

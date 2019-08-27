@@ -57,6 +57,11 @@ public class LineGraphTest extends Application {
             if (tmp != null)
                 FxScheduler.instance().trackedFields.add(new Object[] {lineGraphs[i].runnable, tmp});
         }
+        
+        tmp = searchField(lineGraphs[0], "debugStr");
+        if (tmp != null)
+            FxScheduler.instance().trackedFields.add(new Object[] {lineGraphs[0], tmp});
+        
         Button saveBtn = new Button("Save");
         Button loadBtn = new Button("Load");
         Button startBtn = new Button("Start");

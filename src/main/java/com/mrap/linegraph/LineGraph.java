@@ -127,6 +127,8 @@ public class LineGraph extends GridPane {
     Label txtData2;
 
     public BaseService runnable = new BaseService(120) {
+        long prevDump;
+        
         @Override
         public String getName() {
             return "LineGraph runnable";
@@ -134,7 +136,8 @@ public class LineGraph extends GridPane {
 
         @Override
         public void onStart() {
-
+            prevDump = 0;
+            //debugStr = prevDump + "";
         }
 
         @Override
@@ -151,32 +154,13 @@ public class LineGraph extends GridPane {
                     display(toDraw, showStartEnd[0], showStartEnd[1]);
                 }, FxScheduler.RUNNABLE_PRIORITY_LOW);
             }
-            dump();
-            //try {
-            //    Thread.sleep((long) delay - 1);
-            //} catch (InterruptedException ex) {
-            //    Logger.getLogger(LineGraph.class.getName()).log(Level.SEVERE, null, ex);
-            //}
-            //FutureTask f = new FutureTask(new Callable() {
-            //    @Override
-            //    public Object call() throws Exception {
-            //        display(toDraw, showStartEnd[0], showStartEnd[1]);
-            //        return null;
-            //    }
-            //});
-            //if (Platform.isFxApplicationThread()) {
-            //    f.run();
-            //} else {
-            //    FxRunnableManager.checkAndRun(f);
-            //    try {
-            //        f.get();
-            //        dump();
-            //        Thread.sleep((long) delay - 1);
-            //    } catch (InterruptedException ex) {
-            //    } catch (ExecutionException ex) {
-            //        Logger.getLogger(LineGraph.class.getName()).log(Level.SEVERE, null, ex);
-            //    }
-            //}
+            
+            long currMs = System.currentTimeMillis() - startMs;
+            if (currMs - prevDump > DUMP_INTERVAL_MS) {
+                prevDump = (currMs / 1000) * 1000;
+                //debugStr = prevDump + "";
+                dump();
+            }
         }
 
         @Override
@@ -233,6 +217,7 @@ public class LineGraph extends GridPane {
     private final Object fileDumpLock = new Object();
     protected String name = "";
     File dir = new File(".linegraph");
+    String debugStr = "";
 
     private Runnable dumpRunnable = new Runnable() {
         @Override
@@ -352,6 +337,8 @@ public class LineGraph extends GridPane {
 
     public void dump() {
         synchronized (data) {
+            if (!enableDump)
+                return;
             if (data.isEmpty()) {
                 return;
             }
@@ -361,16 +348,14 @@ public class LineGraph extends GridPane {
             if (isDumping) {
                 return;
             }
-            if ((long) data.get(data.size() - 1)[0] - (long) data.get(dumpStartIdx)[0] > DUMP_INTERVAL_MS) {
-                isDumping = true;
-                internalDump();
-            }
+            
+            isDumping = true;
+            Thread t = new Thread(dumpRunnable);
+            t.start();
+            
+            //if ((long) data.get(data.size() - 1)[0] - (long) data.get(dumpStartIdx)[0] > DUMP_INTERVAL_MS) {
+            //}
         }
-    }
-
-    private void internalDump() {
-        Thread t = new Thread(dumpRunnable);
-        t.start();
     }
 
     public void setLegends(String[] names) {
@@ -632,9 +617,6 @@ public class LineGraph extends GridPane {
                 e.printStackTrace(pw);
                 log(bos.toString() + "\n" + a + " " + b + " " + dumpStartIdx);
             }
-
-            if (enableDump)
-                dump();
         }
     }
 
@@ -870,6 +852,10 @@ public class LineGraph extends GridPane {
             float startPx = (float) Math.floor(showStart0 * widthPerMs);
 
             showEnd = showStart0 + totalShowMs;
+            
+            //debugStr = new StringBuilder().append(this.showStart).append(" ").
+            //        append(showStart0).append(" ").append(showEnd).toString();
+            
             boolean firstFound = false;
             boolean lastFound = false;
             int prevX = Integer.MIN_VALUE;
@@ -914,8 +900,6 @@ public class LineGraph extends GridPane {
                         || lastFound) {
                     if (!firstFound) {
                         firstFound = true;
-                        showStart0 = ts;
-                        showEnd = showStart0 + totalShowMs;
                         if (tempCurrIdx > 0) {
                             tempCurrIdx--;
                             datum = data.get(tempCurrIdx);
