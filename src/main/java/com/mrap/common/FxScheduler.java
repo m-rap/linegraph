@@ -74,12 +74,16 @@ public class FxScheduler extends BaseService {
     public Label DEBUG_LABEL = new Label();
     public ArrayDeque<Object[]> trackedFields = new ArrayDeque<>();
     
+    String debugStr = "";
+    
     private final static FxScheduler instance = new FxScheduler();
     
     private FxScheduler() {
         super(true);
         overrideFrameCount = true;
         DEBUG_LABEL.setMinHeight(Region.USE_PREF_SIZE);
+        DEBUG_LABEL.setPrefHeight(Region.USE_COMPUTED_SIZE);
+        DEBUG_LABEL.setMaxHeight(Region.USE_PREF_SIZE);
     }
     
     private boolean isFrameEmpty() {

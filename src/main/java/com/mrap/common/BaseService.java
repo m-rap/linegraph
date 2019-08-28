@@ -51,8 +51,6 @@ public abstract class BaseService implements Runnable {
     
     private long rest = 0;
     
-    private static final Object LOCK = new Object();
-    
     public BaseService(boolean realTime) {
         this(realTime ? 0.0 : DEFAULT_TARGETFPS);
     }
@@ -69,23 +67,21 @@ public abstract class BaseService implements Runnable {
         return getClass().getSimpleName();
     }
     
-    public void start() throws Exception {
-        synchronized (LOCK) {
-            if (running)
-                return;
+    public synchronized void start() throws Exception {
+        if (running)
+            return;
 
-            try {
-                running = true;
-                t = new Thread(this, getName());
-                startMs = System.currentTimeMillis();
-                prevSec = 0;
-                onStart();
-                t.start();
-            } catch (Exception ex) {
-                running = false;
-                t = null;
-                throw ex;
-            }
+        try {
+            running = true;
+            t = new Thread(this, getName());
+            startMs = System.currentTimeMillis();
+            prevSec = 0;
+            onStart();
+            t.start();
+        } catch (Exception ex) {
+            running = false;
+            t = null;
+            throw ex;
         }
     }
     
@@ -100,19 +96,18 @@ public abstract class BaseService implements Runnable {
         }
     }
     
-    public void stop() {
-        synchronized (LOCK) {
-            if (!running)
-                return;
+    public synchronized void stop() {
+        if (!running)
+            return;
 
-            running = false;
-            frames = 0;
-            framesPerSecond = 0;
-            onStop();
-            if (t.getId() != Thread.currentThread().getId())
-                join();
-            t = null;
+        running = false;
+        frames = 0;
+        framesPerSecond = 0;
+        onStop();
+        if (t.getId() != Thread.currentThread().getId()) {
+            join();
         }
+        t = null;
     }
     
     protected void busySleep(long delay) {

@@ -62,6 +62,10 @@ public class LineGraphTest extends Application {
         if (tmp != null)
             FxScheduler.instance().trackedFields.add(new Object[] {lineGraphs[0], tmp});
         
+        tmp = searchField(FxScheduler.instance(), "debugStr");
+        if (tmp != null)
+            FxScheduler.instance().trackedFields.add(new Object[] {FxScheduler.instance(), tmp});
+        
         Button saveBtn = new Button("Save");
         Button loadBtn = new Button("Load");
         Button startBtn = new Button("Start");
@@ -76,7 +80,7 @@ public class LineGraphTest extends Application {
         box.getChildren().add(new HBox(FxScheduler.instance().DEBUG_LABEL));
         AnchorPane pane = new AnchorPane(box);
         pane.setPrefWidth(600);
-        pane.setPrefHeight(lineGraphCount * 200 + 50);
+        pane.setPrefHeight(lineGraphCount * 200 + 70);
         AnchorPane.setTopAnchor(box, 0.0);
         AnchorPane.setRightAnchor(box, 0.0);
         AnchorPane.setBottomAnchor(box, 0.0);

@@ -47,7 +47,6 @@ import java.util.Scanner;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javafx.application.Platform;
 import javafx.beans.value.ObservableValue;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -149,30 +148,15 @@ public class LineGraph extends GridPane {
         public void onRun() {
             if (isVisible() && getParent() != null) {
                 FxScheduler.checkAndRun(() -> {
-                    long[] showStartEnd = new long[2];
-                    ArrayDeque<float[]> toDraw = createToDraw(showStartEnd);
-                    display(toDraw, showStartEnd[0], showStartEnd[1]);
+                    display();
                 }, FxScheduler.RUNNABLE_PRIORITY_LOW);
             }
-            
+          
             long currMs = System.currentTimeMillis() - startMs;
             if (currMs - prevDump > DUMP_INTERVAL_MS) {
                 prevDump = (currMs / 1000) * 1000;
                 //debugStr = prevDump + "";
                 dump();
-            }
-        }
-
-        @Override
-        public void join() {
-            if (t == null || Platform.isFxApplicationThread()) {
-                return;
-            }
-            try {
-                t.interrupt();
-                t.join();
-            } catch (InterruptedException ex) {
-                Logger.getLogger(BaseService.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
     };
@@ -934,7 +918,11 @@ public class LineGraph extends GridPane {
         return toDraw;
     }
 
-    void display(ArrayDeque<float[]> toDraw, long showStart0, long showEnd) {
+    void display() {
+        long[] showStartEnd = new long[2];
+        ArrayDeque<float[]> toDraw = createToDraw(showStartEnd);
+        long showStart0 = showStartEnd[0], showEnd = showStartEnd[1];
+        
         gc.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
 
         drawAxisY();
