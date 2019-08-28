@@ -5,7 +5,6 @@
  */
 package com.mrap.linegraph;
 
-import com.mrap.common.deprecated.FxScheduler;
 import com.mrap.common.randomdatagenerator.*;
 import com.mrap.common.*;
 import java.lang.reflect.Field;
@@ -13,7 +12,6 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import static javafx.application.Application.launch;
 import javafx.event.ActionEvent;
@@ -31,7 +29,7 @@ import javafx.stage.WindowEvent;
  */
 public class LineGraphTest extends Application {
     
-    int lineGraphCount = 1;
+    int lineGraphCount = 5;
     LineGraph[] lineGraphs;
     Object[] aMinmax = new Object[] {-5f, 5f};
     RandomGenericGenerator randomGenerator = new RandomGenericGenerator(2000, 
