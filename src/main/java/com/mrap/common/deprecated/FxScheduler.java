@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package com.mrap.common;
+package com.mrap.common.deprecated;
 
 import java.lang.reflect.Field;
 import java.util.ArrayDeque;
@@ -50,7 +50,6 @@ public class FxScheduler extends BaseService {
         public void run() {
             r.run();
             instance.frames++;
-            instance.renderDebug();
             synchronized (instance.waiter) {
                 instance.waiter.notifyAll();
             }
@@ -71,9 +70,6 @@ public class FxScheduler extends BaseService {
     
     private final Object waiter = new Object();
     
-    public Label DEBUG_LABEL = new Label();
-    public ArrayDeque<Object[]> trackedFields = new ArrayDeque<>();
-    
     String debugStr = "";
     
     private final static FxScheduler instance = new FxScheduler();
@@ -81,33 +77,10 @@ public class FxScheduler extends BaseService {
     private FxScheduler() {
         super(true);
         overrideFrameCount = true;
-        DEBUG_LABEL.setMinHeight(Region.USE_PREF_SIZE);
-        DEBUG_LABEL.setPrefHeight(Region.USE_COMPUTED_SIZE);
-        DEBUG_LABEL.setMaxHeight(Region.USE_PREF_SIZE);
     }
     
     private boolean isFrameEmpty() {
         return fxRunnables[0].isEmpty() && fxRunnables[1].isEmpty();
-    }
-    
-    private void renderDebug() {
-        if (DEBUG_LABEL.getParent() == null || !DEBUG_LABEL.isVisible())
-            return;
-        StringBuilder sb = new StringBuilder("Log:");
-        for (Object[] arr : trackedFields) {
-            Object o = arr[0];
-            Field f = (Field)arr[1];
-            try {
-                f.setAccessible(true);
-                String name = o.getClass().getName();
-                name = name.substring(name.lastIndexOf(".") + 1);
-                sb.append("\n").append(name).append(".").
-                        append(f.getName()).append(": ").append(f.get(o));
-            } catch (IllegalArgumentException | IllegalAccessException ex) {
-                Logger.getLogger(FxScheduler.class.getName()).log(Level.SEVERE, null, ex);
-            }
-        }
-        DEBUG_LABEL.setText(sb.toString());
     }
 
     private boolean render() {

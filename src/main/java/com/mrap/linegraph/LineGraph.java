@@ -23,8 +23,6 @@
  */
 package com.mrap.linegraph;
 
-import com.mrap.common.FxScheduler;
-import com.mrap.common.BaseService;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -44,9 +42,14 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.Scanner;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javafx.animation.AnimationTimer;
 import javafx.beans.value.ObservableValue;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -124,42 +127,6 @@ public class LineGraph extends GridPane {
     Label txtData1;
     @FXML
     Label txtData2;
-
-    public BaseService runnable = new BaseService(120) {
-        long prevDump;
-        
-        @Override
-        public String getName() {
-            return "LineGraph runnable";
-        }
-
-        @Override
-        public void onStart() {
-            prevDump = 0;
-            //debugStr = prevDump + "";
-        }
-
-        @Override
-        public void onStop() {
-            dump();
-        }
-
-        @Override
-        public void onRun() {
-            if (isVisible() && getParent() != null) {
-                FxScheduler.checkAndRun(() -> {
-                    display();
-                }, FxScheduler.RUNNABLE_PRIORITY_LOW);
-            }
-          
-            long currMs = System.currentTimeMillis() - startMs;
-            if (currMs - prevDump > DUMP_INTERVAL_MS) {
-                prevDump = (currMs / 1000) * 1000;
-                //debugStr = prevDump + "";
-                dump();
-            }
-        }
-    };
     
     float dataYMin = Float.MAX_VALUE, dataYMax = Float.MIN_VALUE, autoYUnitTick = 1;
     private int currIdx = 0;
@@ -202,10 +169,33 @@ public class LineGraph extends GridPane {
     protected String name = "";
     File dir = new File(".linegraph");
     String debugStr = "";
+    AnimationTimer fxTimer = new AnimationTimer() {
+        @Override
+        public void handle(long now) {
+            if (!isVisible() || getParent() == null)
+                return;
+            display();
+        }
+    };
+    ScheduledExecutorService dumpExecutor = Executors.newSingleThreadScheduledExecutor();
+    ScheduledExecutorService executorTerminator = Executors.newSingleThreadScheduledExecutor();
+    private ScheduledFuture<?> dumpScheduledFuture = null;
+    private ScheduledFuture<?> terminatorSceduledFuture = null;
 
     private Runnable dumpRunnable = new Runnable() {
         @Override
         public void run() {
+            if (!enableDump)
+                return;
+            if (data.isEmpty()) {
+                return;
+            }
+            if (dumpStartIdx >= data.size() || dumpStartIdx < 0) {
+                return;
+            }
+            
+            isDumping = true;
+            
             ArrayDeque<Object[]> temp;
             synchronized (data) {
                 long a = (long)data.get(0)[0], b = (long)data.get(data.size() - 1)[0];
@@ -313,34 +303,13 @@ public class LineGraph extends GridPane {
             }
             onResize(width1, canvas.getHeight());
         });
+        
+        fxTimer.start();
     }
     
     //public void setIsDrawChartOnSave(boolean isDrawChartOnSave) {
     //    this.isDrawChartOnSave = isDrawChartOnSave;
     //}
-
-    public void dump() {
-        synchronized (data) {
-            if (!enableDump)
-                return;
-            if (data.isEmpty()) {
-                return;
-            }
-            if (dumpStartIdx >= data.size() || dumpStartIdx < 0) {
-                return;
-            }
-            if (isDumping) {
-                return;
-            }
-            
-            isDumping = true;
-            Thread t = new Thread(dumpRunnable);
-            t.start();
-            
-            //if ((long) data.get(data.size() - 1)[0] - (long) data.get(dumpStartIdx)[0] > DUMP_INTERVAL_MS) {
-            //}
-        }
-    }
 
     public void setLegends(String[] names) {
         txtData0.setText(names[0]);
@@ -601,6 +570,29 @@ public class LineGraph extends GridPane {
                 e.printStackTrace(pw);
                 log(bos.toString() + "\n" + a + " " + b + " " + dumpStartIdx);
             }
+            
+            if (dumpScheduledFuture == null || dumpScheduledFuture.isDone()) {
+                dumpScheduledFuture = dumpExecutor.scheduleAtFixedRate(() -> {
+                    dumpRunnable.run();
+                }, 0, DUMP_INTERVAL_MS, TimeUnit.MILLISECONDS);
+            }
+            
+            if (terminatorSceduledFuture != null && !terminatorSceduledFuture.isDone()) {
+                terminatorSceduledFuture.cancel(true);
+            }
+            
+            terminatorSceduledFuture = executorTerminator.schedule(() -> {
+                dumpExecutor.shutdown();
+                try {
+                    dumpExecutor.awaitTermination(5000, TimeUnit.MILLISECONDS);
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(LineGraph.class.getName()).log(Level.SEVERE, null, ex);
+                }
+                dumpExecutor = Executors.newSingleThreadScheduledExecutor();
+                dumpRunnable.run();
+                executorTerminator.shutdown();
+                executorTerminator = Executors.newSingleThreadScheduledExecutor();
+            }, 500, TimeUnit.MILLISECONDS);
         }
     }
 
@@ -627,7 +619,7 @@ public class LineGraph extends GridPane {
             final Consumer<Object> progressConsumer, final String path,
             final String... headers) {
         Thread t = new Thread(() -> {
-            runnable.stop();
+            //runnable.stop();
             isSaving = true;
             try {
                 File f = new File(path);
@@ -744,7 +736,7 @@ public class LineGraph extends GridPane {
             }
             isSaving = false;
             try {
-                runnable.start();
+                //runnable.start();
             } catch (Exception ex) {
                 Logger.getLogger(LineGraph.class.getName()).log(Level.SEVERE, null, ex);
             }

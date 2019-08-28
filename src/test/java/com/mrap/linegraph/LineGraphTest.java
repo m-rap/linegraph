@@ -5,6 +5,7 @@
  */
 package com.mrap.linegraph;
 
+import com.mrap.common.deprecated.FxScheduler;
 import com.mrap.common.randomdatagenerator.*;
 import com.mrap.common.*;
 import java.lang.reflect.Field;
@@ -12,6 +13,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import static javafx.application.Application.launch;
 import javafx.event.ActionEvent;
@@ -29,42 +31,31 @@ import javafx.stage.WindowEvent;
  */
 public class LineGraphTest extends Application {
     
-    int lineGraphCount = 2;
+    int lineGraphCount = 1;
     LineGraph[] lineGraphs;
     Object[] aMinmax = new Object[] {-5f, 5f};
     RandomGenericGenerator randomGenerator = new RandomGenericGenerator(2000, 
             new Object[][] { aMinmax });
+    DebugLabel debugLabel = new DebugLabel();
     
     @Override
     public void start(Stage primaryStage) throws Exception {
+        
         randomGenerator.listeners.add((RandomGeneratorListener<float[]>) (float[] result) -> {
             for (LineGraph l : lineGraphs)
                 l.addData(System.currentTimeMillis(), result[0], result[1], result[2]);
         });
         
-        Field tmp = searchField(FxScheduler.instance(), "framesPerSecond");
-        if (tmp != null)
-            FxScheduler.instance().trackedFields.add(new Object[] {FxScheduler.instance(), tmp});
-        
-        tmp = searchField(randomGenerator, "framesPerSecond");
-        if (tmp != null)
-            FxScheduler.instance().trackedFields.add(new Object[] {randomGenerator, tmp});
+        //debugLabel.trackField(FxScheduler.instance(), "framesPerSecond");
+        debugLabel.trackField(randomGenerator, "fps");
         
         lineGraphs = new LineGraph[lineGraphCount];
         for (int i = 0; i < lineGraphCount; i++) {
             lineGraphs[i] = new LineGraph(-5f, 5f, 1, 5, 100);
-            tmp = searchField(lineGraphs[i].runnable, "framesPerSecond");
-            if (tmp != null)
-                FxScheduler.instance().trackedFields.add(new Object[] {lineGraphs[i].runnable, tmp});
+            //debugLabel.trackField(lineGraphs[i].runnable, "framesPerSecond");
         }
         
-        tmp = searchField(lineGraphs[0], "debugStr");
-        if (tmp != null)
-            FxScheduler.instance().trackedFields.add(new Object[] {lineGraphs[0], tmp});
-        
-        tmp = searchField(FxScheduler.instance(), "debugStr");
-        if (tmp != null)
-            FxScheduler.instance().trackedFields.add(new Object[] {FxScheduler.instance(), tmp});
+        debugLabel.trackField(lineGraphs[0], "debugStr");
         
         Button saveBtn = new Button("Save");
         Button loadBtn = new Button("Load");
@@ -77,7 +68,7 @@ public class LineGraphTest extends Application {
             box.getChildren().add(l);
         }
         box.getChildren().add(hbox);
-        box.getChildren().add(new HBox(FxScheduler.instance().DEBUG_LABEL));
+        box.getChildren().add(new HBox(debugLabel));
         AnchorPane pane = new AnchorPane(box);
         pane.setPrefWidth(600);
         pane.setPrefHeight(lineGraphCount * 200 + 70);
@@ -108,7 +99,8 @@ public class LineGraphTest extends Application {
             long start = System.currentTimeMillis();
             int[] counter = new int[] {0};
             randomGenerator.nextMsRandoms(900000, (Object res) -> {
-                long ts = (long)((double)counter[0]*(1000.0/randomGenerator.targetFps))+start;
+                //long ts = (long)((double)counter[0]*(1000.0/randomGenerator.targetFps))+start;
+                long ts = (long)((double)counter[0]*(randomGenerator.freq))+start;
                 float[] result = (float[])res;
                 //String[] str = new String[6];
                 //for (int i = 0; i < 3; i++)
@@ -127,12 +119,14 @@ public class LineGraphTest extends Application {
         primaryStage.setScene(new Scene(pane));
         primaryStage.setOnCloseRequest((WindowEvent event) -> {
             randomGenerator.stop();
-            for (LineGraph l : lineGraphs)
-                l.runnable.stop();
+            //for (LineGraph l : lineGraphs) {
+            //    l.dumpExecutor.shutdown();
+            //}
         });
         primaryStage.show();
-        for (LineGraph l : lineGraphs)
-            l.runnable.start();
+        //for (LineGraph l : lineGraphs) {
+        //    l.runnable.start();
+        //}
     }
 
     private Field searchField(Object o, String name) throws SecurityException {

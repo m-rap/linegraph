@@ -23,30 +23,52 @@
  */
 package com.mrap.common.randomdatagenerator;
 
-import com.mrap.common.BaseService;
 import java.util.ArrayDeque;
 import java.util.Random;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
  * @author m_rap
  * @param <T>
  */
-public abstract class RandomDataGenerator<T> extends BaseService {
+public abstract class RandomDataGenerator<T> {
     
+    public final int freq;
     final Random r;
     public ArrayDeque<RandomGeneratorListener<T>> listeners = new ArrayDeque<>();
+    ScheduledExecutorService executor;
+    int fps = 0;
+    int frames = 0;
+    long prevSec = 0;
     
-    public RandomDataGenerator(int freq) {
-        super(freq);
+    Runnable runnable = () -> {
+        for (RandomGeneratorListener<T> l : listeners)
+            l.onNextRandom(nextRandom());
+        frames++;
+        long now = System.currentTimeMillis();
+        long currSec = now / 1000;
+        if (currSec > prevSec) {
+            prevSec = currSec;
+            fps = frames;
+            frames = 0;
+        }
+    };
+    
+    public RandomDataGenerator(int freq0) {
+        freq = freq0;
         r = new Random();
     }
     
     protected abstract T nextRandom();
     
     public void nextMsRandoms(long ms, Consumer<T> consumer) {
-        long count = (long)targetFps;
+        long count = (long)freq;
         for (int i = 0; i < count; i++) {
             consumer.accept(nextRandom());
         }
@@ -73,20 +95,18 @@ public abstract class RandomDataGenerator<T> extends BaseService {
         }
         return rangeBottom + r.nextFloat() * range;
     }
-
-    @Override
-    public void onStart() throws Exception {
-        
+    
+    public void start() {
+        executor = Executors.newSingleThreadScheduledExecutor();
+        executor.scheduleAtFixedRate(runnable, 0, (long)((1000.0 / freq) * 1000), TimeUnit.MICROSECONDS);
     }
-
-    @Override
-    public void onStop() {
-        
-    }
-
-    @Override
-    public void onRun() {
-        for (RandomGeneratorListener<T> l : listeners)
-            l.onNextRandom(nextRandom());
+    
+    public void stop() {
+        try {
+            executor.shutdown();
+            executor.awaitTermination(3000, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException ex) {
+            Logger.getLogger(RandomDataGenerator.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
 }
