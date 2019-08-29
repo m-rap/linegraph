@@ -45,15 +45,19 @@ public class DebugLabel extends Label {
             for (Object[] arr : trackedFields) {
                 Object o = arr[0];
                 Field f = (Field)arr[1];
+                boolean tmpAccessible = f.isAccessible();
+                f.setAccessible(true);
+                String name = o.getClass().getName();
+                String value = "";
                 try {
-                    f.setAccessible(true);
-                    String name = o.getClass().getName();
-                    name = name.substring(name.lastIndexOf(".") + 1);
-                    sb.append("\n").append(name).append(".").
-                            append(f.getName()).append(": ").append(f.get(o));
+                    value = f.get(o) + "";
                 } catch (IllegalArgumentException | IllegalAccessException ex) {
                     Logger.getLogger(DebugLabel.class.getName()).log(Level.SEVERE, null, ex);
                 }
+                f.setAccessible(tmpAccessible);
+                name = name.substring(name.lastIndexOf(".") + 1);
+                sb.append("\n").append(name).append(".").
+                        append(f.getName()).append(": ").append(value);
             }
             setText(sb.toString());
         }
