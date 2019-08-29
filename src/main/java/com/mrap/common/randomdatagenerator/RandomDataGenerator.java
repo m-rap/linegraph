@@ -42,7 +42,7 @@ public abstract class RandomDataGenerator<T> {
     public final int freq;
     final Random r;
     public ArrayDeque<RandomGeneratorListener<T>> listeners = new ArrayDeque<>();
-    ScheduledExecutorService executor;
+    ScheduledExecutorService executor = null;
     int fps = 0;
     int frames = 0;
     long prevSec = 0;
@@ -103,6 +103,8 @@ public abstract class RandomDataGenerator<T> {
     
     public void stop() {
         try {
+            if (executor == null)
+                return;
             executor.shutdown();
             executor.awaitTermination(3000, TimeUnit.MILLISECONDS);
         } catch (InterruptedException ex) {

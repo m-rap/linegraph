@@ -77,11 +77,19 @@ import javafx.scene.text.Font;
  * @author software
  */
 public class LineGraph extends GridPane {
+    
+    class Field {
+        boolean showData;
+        CheckBox cbData;
+        Label txtData;
+        Paint color;
+    }
 
     static final int CLEAR_DATA_MS = 5 * 60 * 1000; // 5 menit
     private long DUMP_INTERVAL_MS = 60 * 1000;
     static float MIN_AUTOTICK = 0.005f;
     final static float DEFAULT_TICK_COUNT = 5.0f;
+    private static final String[] DEFAULT_NAMES = {"X", "Y", "Z"};
 
     @FXML
     GridPane gridPane;
@@ -101,12 +109,7 @@ public class LineGraph extends GridPane {
     HBox legendBox;
     @FXML
     HBox legendBoxBase; // 1,4
-    @FXML
-    CheckBox cbData0;
-    @FXML
-    CheckBox cbData1;
-    @FXML
-    CheckBox cbData2;
+    
     @FXML
     CheckBox cbAutoscale;
 
@@ -120,13 +123,9 @@ public class LineGraph extends GridPane {
     TextField txtXUnitTick;
     @FXML
     TextField txtWidthPerSec;
-
-    @FXML
-    Label txtData0;
-    @FXML
-    Label txtData1;
-    @FXML
-    Label txtData2;
+    
+    private int nFields = -1;
+    private Field[] fields;
     
     float dataYMin = Float.MAX_VALUE, dataYMax = Float.MIN_VALUE, autoYUnitTick = 1;
     private int currIdx = 0;
@@ -148,7 +147,7 @@ public class LineGraph extends GridPane {
     long last;
     GraphicsContext gc;
     private double lineWidth;
-    private Paint[] colors;
+    
     private float END_GAP = 0.9f;
     private long totalShowMs;
     private long totalMs;
@@ -160,10 +159,7 @@ public class LineGraph extends GridPane {
     private boolean showYRuler = true;
     private boolean showScrollBar = true;
     private boolean showLegendBox = true;
-    private boolean showData0 = true;
-    private boolean showData1 = true;
-    private boolean showData2 = true;
-    CheckBox[] cbData;
+    
     private float widthPerMs;
     private final Object fileDumpLock = new Object();
     protected String name = "";
@@ -279,12 +275,11 @@ public class LineGraph extends GridPane {
         //    if (name != null && !name.isEmpty())
         //        PropertiesLoader.getDefault().setProperty("linegraph_" + name + "_autoscale", newValue ? "true" : "false");
         //});
+        
+        setnFields(3);
 
-        cbData = new CheckBox[]{cbData0, cbData1, cbData2};
         scrollRect = (Rectangle) scrollBar.getChildren().get(0);
         gc = canvas.getGraphicsContext2D();
-
-        setDefaultStyle();
 
         setScale(yMin1, yMax1, yUnitTick1, xUnitTick1, widthPerSec1);
 
@@ -312,9 +307,12 @@ public class LineGraph extends GridPane {
     //}
 
     public void setLegends(String[] names) {
-        txtData0.setText(names[0]);
-        txtData1.setText(names[1]);
-        txtData2.setText(names[2]);
+        if (fields == null)
+            return;
+        
+        for (int i = 0; i < fields.length; i++) {
+            fields[i].txtData.setText(names[i]);
+        }
     }
 
     @FXML
@@ -352,29 +350,20 @@ public class LineGraph extends GridPane {
     private void setDefaultStyle() {
         Pane paneAux = new Pane();
         Scene sceneAux = new Scene(paneAux);
-        colors = new Paint[3];
-        Line line = new Line();
-        line.getStyleClass().add("default-color0");
-        line.getStyleClass().add("chart-series-line");
-        paneAux.getChildren().clear();
-        paneAux.getChildren().add(line);
-        line.applyCss();
-        colors[0] = line.getStroke();
-        lineWidth = line.getStrokeWidth();
-        line = new Line();
-        line.getStyleClass().add("default-color1");
-        line.getStyleClass().add("chart-series-line");
-        paneAux.getChildren().clear();
-        paneAux.getChildren().add(line);
-        line.applyCss();
-        colors[1] = line.getStroke();
-        line = new Line();
-        line.getStyleClass().add("default-color2");
-        line.getStyleClass().add("chart-series-line");
-        paneAux.getChildren().clear();
-        paneAux.getChildren().add(line);
-        line.applyCss();
-        colors[2] = line.getStroke();
+        
+        if (fields == null)
+            return;
+        
+        for (int i = 0; i < fields.length; i++) {
+            Line line = new Line();
+            line.getStyleClass().add("default-color" + (i%8));
+            line.getStyleClass().add("chart-series-line");
+            paneAux.getChildren().clear();
+            paneAux.getChildren().add(line);
+            line.applyCss();
+            lineWidth = line.getStrokeWidth();
+            fields[i].color = line.getStroke();
+        }
     }
 
     private void onResize(double width, double height) {
@@ -477,42 +466,41 @@ public class LineGraph extends GridPane {
         if (isSaving) {
             return;
         }
+        
+        if (datum.length < nFields + 1) {
+            Object[] temp = new Object[nFields + 1];
+            temp[0] = datum[0];
+            int i;
+            for (i = 0; i < datum.length - 1; i++) {
+                temp[i + 1] = datum[i + 1];
+            }
+            for (; i < nFields; i++) {
+                temp[i + 1] = 0;
+            }
+            datum = temp;
+        }
+        
         synchronized (data) {
             if (startMs == -1) {
                 startMs = (long) datum[0];
             }
+            
             data.add(datum);
             boolean autoscaleChanged = false;
-            if (showData0) {
-                if ((float) datum[1] < dataYMin) {
-                    dataYMin = (float) datum[1];
-                    autoscaleChanged = true;
-                }
-                if ((float) datum[1] > dataYMax) {
-                    dataYMax = (float) datum[1];
-                    autoscaleChanged = true;
-                }
-            }
-            if (showData1) {
-                if ((float) datum[2] < dataYMin) {
-                    dataYMin = (float) datum[2];
-                    autoscaleChanged = true;
-                }
-                if ((float) datum[2] > dataYMax) {
-                    dataYMax = (float) datum[2];
-                    autoscaleChanged = true;
+            
+            for (int i = 0; i < nFields; i++) {
+                if (fields[i].showData) {
+                    if ((float) datum[i + 1] < dataYMin) {
+                        dataYMin = (float) datum[i + 1];
+                        autoscaleChanged = true;
+                    }
+                    if ((float) datum[i + 1] > dataYMax) {
+                        dataYMax = (float) datum[i + 1];
+                        autoscaleChanged = true;
+                    }
                 }
             }
-            if (showData2) {
-                if ((float) datum[3] < dataYMin) {
-                    dataYMin = (float) datum[3];
-                    autoscaleChanged = true;
-                }
-                if ((float) datum[3] > dataYMax) {
-                    dataYMax = (float) datum[3];
-                    autoscaleChanged = true;
-                }
-            }
+            
             if (autoscaleChanged) {
                 autoYUnitTick = dataYMax - dataYMin;
                 if (autoYUnitTick <= MIN_AUTOTICK / autoTickCount)
@@ -533,7 +521,7 @@ public class LineGraph extends GridPane {
                 
             }
 
-            long timeLength = 0, a = 0, b = 0;
+            long timeLength, a = 0, b = 0;
             try {
                 a = (long)data.get(0)[0];
                 timeLength = (long) datum[0] - a;
@@ -861,10 +849,10 @@ public class LineGraph extends GridPane {
                 }
                 prevX = (int) scaledX;
                     
-                float[] toDrawEl = new float[4];
+                float[] toDrawEl = new float[nFields + 1];
                 toDrawEl[0] = scaledX - startPx;
-                for (int i = 0; i < datum.length - 1; i++) {
-                    if (!cbData[i].isSelected()) {
+                for (int i = 0; i < nFields; i++) {
+                    if (!fields[i].cbData.isSelected()) {
                         continue;
                     }
                     float scaledY = -((float) datum[i + 1] - tmpYMax) *
@@ -915,21 +903,15 @@ public class LineGraph extends GridPane {
         drawAxisX(showStart0, showEnd);
 
         gc.setLineWidth(lineWidth);
-        for (int i = 0; i < 3; i++) {
-            if (!cbData[i].isSelected()) {
+        for (int i = 0; i < nFields; i++) {
+            if (!fields[i].cbData.isSelected()) {
                 continue;
             }
-            if (i == 0 && !showData0) {
-                continue;
-            }
-            if (i == 1 && !showData1) {
-                continue;
-            }
-            if (i == 2 && !showData2) {
+            if (!fields[i].showData) {
                 continue;
             }
 
-            gc.setStroke(colors[i]);
+            gc.setStroke(fields[i].color);
             Iterator<float[]> it = toDraw.iterator();
             if (!it.hasNext()) {
                 break;
@@ -999,64 +981,50 @@ public class LineGraph extends GridPane {
         return showLegendBox;
     }
 
-    /**
-     * @return the showData0
-     */
-    public boolean isShowData0() {
-        return showData0;
-    }
-
-    /**
-     * @param showData0 the showData0 to set
-     */
-    public void setShowData0(boolean showData0) {
-        this.showData0 = showData0;
-        updateDataShow();
-    }
-
-    /**
-     * @return the showData1
-     */
-    public boolean isShowData1() {
-        return showData1;
-    }
-
-    /**
-     * @param showData1 the showData1 to set
-     */
-    public void setShowData1(boolean showData1) {
-        this.showData1 = showData1;
-        updateDataShow();
-    }
-
-    /**
-     * @return the showData2
-     */
-    public boolean isShowData2() {
-        return showData2;
-    }
-
-    /**
-     * @param showData2 the showData2 to set
-     */
-    public void setShowData2(boolean showData2) {
-        this.showData2 = showData2;
-        updateDataShow();
-    }
-
-    void updateDataShow() {
+    private void updateDataShow() {
         legendBox.getChildren().clear();
-        if (showData0) {
-            legendBox.getChildren().add(cbData0);
-            legendBox.getChildren().add(txtData0);
+        for (Field f : fields) {
+            legendBox.getChildren().add(f.cbData);
+            legendBox.getChildren().add(f.txtData);
         }
-        if (showData1) {
-            legendBox.getChildren().add(cbData1);
-            legendBox.getChildren().add(txtData1);
-        }
-        if (showData2) {
-            legendBox.getChildren().add(cbData2);
-            legendBox.getChildren().add(txtData2);
+    }
+
+    /**
+     * @return the nFields
+     */
+    public int getnFields() {
+        return nFields;
+    }
+
+    /**
+     * @param nFields the nFields to set
+     */
+    public void setnFields(int nFields) {
+        synchronized (data) {
+            if (!data.isEmpty())
+                return;
+            this.nFields = nFields;
+            fields = new Field[nFields];
+            for (int i = 0; i < nFields; i++) {
+                fields[i] = new Field();
+                
+                CheckBox cb = new CheckBox();
+                cb.setSelected(true);
+                fields[i].cbData = cb;
+                
+                Label l =  new Label(i < 3 ? DEFAULT_NAMES[i] : "");
+                Pane p = new Pane();
+                p.getStyleClass().add("default-color" + (i%8));
+                p.getStyleClass().add("chart-line-symbol");
+                p.setPrefHeight(10);
+                p.setPrefWidth(10);
+                l.setGraphic(p);
+                fields[i].txtData = l;
+                
+                fields[i].showData = true;
+            }
+            updateDataShow();
+            setDefaultStyle();
         }
     }
 
