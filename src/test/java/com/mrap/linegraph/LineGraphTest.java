@@ -29,7 +29,7 @@ import javafx.stage.WindowEvent;
  */
 public class LineGraphTest extends Application {
     
-    int lineGraphCount = 5;
+    int lineGraphCount = 1;
     LineGraph[] lineGraphs;
     Object[] aMinmax = new Object[] {-5f, 5f};
     RandomGenericGenerator randomGenerator = new RandomGenericGenerator(2000, 

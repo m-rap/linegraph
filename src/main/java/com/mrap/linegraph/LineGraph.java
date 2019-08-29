@@ -45,6 +45,7 @@ import java.util.Scanner;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.logging.Level;
@@ -166,8 +167,11 @@ public class LineGraph extends GridPane {
         }
     };
     
-    private ScheduledExecutorService dumpExecutor = Executors.newSingleThreadScheduledExecutor();
-    private ScheduledExecutorService executorTerminator = Executors.newSingleThreadScheduledExecutor();
+    static ThreadFactory dumpThreadFactory = (Runnable r) -> new Thread(r, "dumper");
+    static ThreadFactory terminatorThreadFactory = (Runnable r) -> new Thread(r, "terminator");
+    
+    private ScheduledExecutorService dumpExecutor = Executors.newSingleThreadScheduledExecutor(dumpThreadFactory);
+    private ScheduledExecutorService executorTerminator = Executors.newSingleThreadScheduledExecutor(terminatorThreadFactory);
     private ScheduledFuture<?> dumpScheduledFuture = null;
     private ScheduledFuture<?> terminatorSceduledFuture = null;
 
@@ -215,11 +219,13 @@ public class LineGraph extends GridPane {
                         }
                         buff = ByteBuffer.allocate(8 + 4 * nFields).order(ByteOrder.LITTLE_ENDIAN);
                         for (Object[] datum : temp) {
+                            buff.position(0);
                             buff.putLong((long) datum[0]);
                             for (int i = 0; i < nFields; i++)
                                 buff.putFloat((float) datum[i + 1]);
                             fos.write(buff.array());
                         }
+                        fos.flush();
                         fos.close();
                         dumpedSize += temp.size();
                         dumpedEndIdx = dumpEndIdx;
@@ -506,9 +512,8 @@ public class LineGraph extends GridPane {
             }
             
             if (dumpScheduledFuture == null || dumpScheduledFuture.isDone()) {
-                dumpScheduledFuture = dumpExecutor.scheduleAtFixedRate(() -> {
-                    dumpRunnable.run();
-                }, 0, DUMP_INTERVAL_MS, TimeUnit.MILLISECONDS);
+                dumpScheduledFuture = dumpExecutor.scheduleAtFixedRate(dumpRunnable,
+                        0, DUMP_INTERVAL_MS, TimeUnit.MILLISECONDS);
             }
             
             if (terminatorSceduledFuture != null && !terminatorSceduledFuture.isDone()) {
@@ -522,11 +527,11 @@ public class LineGraph extends GridPane {
                 } catch (InterruptedException ex) {
                     Logger.getLogger(LineGraph.class.getName()).log(Level.SEVERE, null, ex);
                 }
-                dumpExecutor = Executors.newSingleThreadScheduledExecutor();
+                dumpExecutor = Executors.newSingleThreadScheduledExecutor(dumpThreadFactory);
                 dumpRunnable.run();
                 executorTerminator.shutdown();
-                executorTerminator = Executors.newSingleThreadScheduledExecutor();
-            }, 500, TimeUnit.MILLISECONDS);
+                executorTerminator = Executors.newSingleThreadScheduledExecutor(terminatorThreadFactory);
+            }, 1000, TimeUnit.MILLISECONDS);
         }
     }
 
@@ -669,7 +674,6 @@ public class LineGraph extends GridPane {
             dataYMax = Float.MIN_VALUE;
             autoYUnitTick = 1;
             currIdx = 0;
-            startMs = -1;
             dumpedSize = 0;
             dumpedEndIdx = -1;
             dumpStartIdx = 0;
