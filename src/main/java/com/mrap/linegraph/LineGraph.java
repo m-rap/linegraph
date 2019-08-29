@@ -380,7 +380,6 @@ public class LineGraph extends GridPane {
     private void onResize(double width, double height) {
         canvas.setWidth(width);
         canvas.setHeight(height);
-        //runnable.onRun();
     }
     
     ArrayDeque<Label> lbls = new ArrayDeque<>();
@@ -411,9 +410,6 @@ public class LineGraph extends GridPane {
         for (; y <= tmpYMax; y += tmpYUnitTick) {
             float actualY = tmpYMax - y;
             double scaledActualY = actualY * height / (tmpYMax - tmpYMin);
-            //if (scaledActualY < 1 || scaledActualY > height - 1) {
-            //    continue;
-            //}
             if (gridPane.getChildren().contains(yRuler)) {
                 Label text;
                 if (!lbls.isEmpty())
@@ -422,11 +418,9 @@ public class LineGraph extends GridPane {
                     text = new Label();
                 if (tmpYUnitTick < 1.0f)
                     text.setText(DF.format(y));
-                    //text.setText(String.format("%.3f", y));
                 else
                     text.setText(String.format("%.0f", y));
                 text.setFont(AXIS_FONT);
-                //text.setStyle("-fx-background-color: red;");
                 text.applyCss();
                 if (scaledActualY - 5 + text.getBoundsInLocal().getHeight() < yRuler.getBoundsInLocal().getHeight() &&
                         scaledActualY - 5 > 0) {
@@ -439,8 +433,6 @@ public class LineGraph extends GridPane {
             }
             gc.strokeLine(0, scaledActualY, width, scaledActualY);
         }
-        //if (width != canvas.getWidth() || height != canvas.getHeight())
-        //    System.out.println(canvas.getWidth() + " " + canvas.getHeight());
     }
 
     private void drawAxisX(long showStart, long showEnd) {
@@ -451,7 +443,6 @@ public class LineGraph extends GridPane {
         long x = (long) ((float) Math.ceil(showStart / (xUnitTick * 1000)) * xUnitTick * 1000);
         double y2 = canvas.getHeight();
         while (x < showEnd) {
-            //double scaledActualX = (x - xStart) * widthPerSec;
             double scaledActualX = (x - showStart) * widthPerMs;
             gc.strokeLine(scaledActualX, 0, scaledActualX, y2);
             if (gridPane.getChildren().contains(xRuler)) {
@@ -466,7 +457,6 @@ public class LineGraph extends GridPane {
                     text.setText("" + ((x + ((long) data.get(0)[0] - startMs)) / 1000));
                 }
                 text.setFont(AXIS_FONT);
-                //text.setStyle("-fx-background-color: red;");
                 text.applyCss();
                 if (scaledActualX + text.getBoundsInLocal().getWidth() < xRuler.getWidth() &&
                         scaledActualX > 0) {
@@ -481,11 +471,6 @@ public class LineGraph extends GridPane {
             }
             x += (xUnitTick * 1000);
         }
-        //double w = canvas.getWidth(), h = canvas.getHeight();
-        //gridPane.applyCss();
-        //gridPane.layout();
-        //if (w != canvas.getWidth() || h != canvas.getHeight())
-        //    System.out.println(canvas.getWidth() + " " + canvas.getHeight());
     }
 
     public void addData(Object... datum) {
@@ -828,85 +813,72 @@ public class LineGraph extends GridPane {
             float startPx = (float) Math.floor(showStart0 * widthPerMs);
 
             showEnd = showStart0 + totalShowMs;
+            showStartEnd[0] = showStart0;
+            showStartEnd[1] = showEnd;
+            
+            if (data.isEmpty())
+                return toDraw;
             
             //debugStr = new StringBuilder().append(this.showStart).append(" ").
             //        append(showStart0).append(" ").append(showEnd).toString();
             
-            boolean firstFound = false;
-            boolean lastFound = false;
             int prevX = Integer.MIN_VALUE;
             long ts = 0;
-
-            if (!data.isEmpty()) {
-                if (currIdx > data.size() - 1) {
-                    currIdx = data.size() - 1;
-                }
-                int tempCurrIdx = currIdx;
-                for (; tempCurrIdx >= 0; tempCurrIdx--) {
-                    Object[] datum = data.get(tempCurrIdx);
-                    ts = (long) datum[0] - start;
-                    if (ts < showStart0) {
-                        break;
-                    }
-                }
-                currIdx = (tempCurrIdx < 0) ? 0 : tempCurrIdx;
-            }
             
-            float tmpYMin, tmpYMax, tmpYUnitTick;
+            float tmpYMin, tmpYMax;
             if (cbAutoscale.isSelected() && dataYMin < Float.MAX_VALUE) {
                 tmpYMin = autoYMin;
                 tmpYMax = autoYMax;
-                tmpYUnitTick = autoYUnitTick;
             } else {
                 tmpYMin = yMin;
                 tmpYMax = yMax;
-                tmpYUnitTick = yUnitTick;
             }
+            
+            for (; currIdx >= 0; currIdx--) {
+                Object[] datum = data.get(currIdx);
+                ts = (long) datum[0] - start;
+                if (ts < showStart0)
+                    break;
+            }
+            if (currIdx < 0) currIdx = 0;
+            
+            for (; currIdx < data.size(); currIdx++) {
+                Object[] datum = data.get(currIdx);
+                ts = (long) datum[0] - start;
+                if (ts >= showStart0) {
+                    break;
+                }
+            }
+            if (currIdx > 0) currIdx--;
             
             for (int tempCurrIdx = currIdx; tempCurrIdx < data.size(); tempCurrIdx++) {
                 Object[] datum = data.get(tempCurrIdx);
                 ts = (long) datum[0] - start;
                 float scaledX = (float) Math.floor(ts * widthPerMs);
+                
                 if ((int) scaledX == prevX) {
                     continue;
                 }
                 prevX = (int) scaledX;
-                if ((!firstFound && ts >= showStart0 && ts <= showEnd)
-                        || (firstFound && ts <= showEnd && !lastFound)
-                        || lastFound) {
-                    if (!firstFound) {
-                        firstFound = true;
-                        if (tempCurrIdx > 0) {
-                            tempCurrIdx--;
-                            datum = data.get(tempCurrIdx);
-                            ts = (long) datum[0] - start;
-                            scaledX = (float) Math.floor(ts * widthPerMs);
-                        }
-                        currIdx = tempCurrIdx;
+                    
+                float[] toDrawEl = new float[4];
+                toDrawEl[0] = scaledX - startPx;
+                for (int i = 0; i < datum.length - 1; i++) {
+                    if (!cbData[i].isSelected()) {
+                        continue;
                     }
-                    float[] toDrawEl = new float[4];
-                    toDrawEl[0] = scaledX - startPx;
-                    for (int i = 0; i < datum.length - 1; i++) {
-                        if (!cbData[i].isSelected()) {
-                            continue;
-                        }
-                        float scaledY = -((float) datum[i + 1] - tmpYMax) * (float) canvas.getHeight() / (tmpYMax - tmpYMin);
-                        toDrawEl[i + 1] = scaledY;
-                    }
-                    toDraw.add(toDrawEl);
-                    if (lastFound) {
-                        break;
-                    }
-                } else if (!lastFound && ts > showEnd) {
-                    lastFound = true;
-                    tempCurrIdx--;
-                } else if (ts > showEnd) {
+                    float scaledY = -((float) datum[i + 1] - tmpYMax) *
+                            (float) canvas.getHeight() / (tmpYMax - tmpYMin);
+                    toDrawEl[i + 1] = scaledY;
+                }
+                toDraw.add(toDrawEl);
+                
+                if (ts > showEnd) {
                     break;
                 }
             }
         }
-        showStartEnd[0] = showStart0;
-        showStartEnd[1] = showEnd;
+        
         return toDraw;
     }
 
