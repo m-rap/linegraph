@@ -105,6 +105,8 @@ public abstract class RandomDataGenerator<T> {
         try {
             if (executor == null)
                 return;
+            fps = 0;
+            frames = 0;
             executor.shutdown();
             executor.awaitTermination(3000, TimeUnit.MILLISECONDS);
         } catch (InterruptedException ex) {

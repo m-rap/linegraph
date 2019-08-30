@@ -180,25 +180,25 @@ public class LineGraph extends GridPane {
         public void run() {
             if (!enableDump)
                 return;
-            if (data.isEmpty()) {
+            if (getData().isEmpty()) {
                 return;
             }
-            if (dumpStartIdx >= data.size() || dumpStartIdx < 0) {
+            if (dumpStartIdx >= getData().size() || dumpStartIdx < 0) {
                 return;
             }
             
             isDumping = true;
             
             ArrayDeque<Object[]> temp;
-            synchronized (data) {
-                long a = (long)data.get(0)[0], b = (long)data.get(data.size() - 1)[0];
-                log("start dumping from " + (long)data.get(dumpStartIdx)[0] + 
-                        ", current data size,start,end,length " + data.size() + "," + a +
+            synchronized (getData()) {
+                long a = (long)getData().get(0)[0], b = (long)getData().get(getData().size() - 1)[0];
+                log("start dumping from " + (long)getData().get(dumpStartIdx)[0] + 
+                        ", current data size,start,end,length " + getData().size() + "," + a +
                         "," + b + "," + (b - a));
-                dumpEndIdx = data.size() - 1;
+                dumpEndIdx = getData().size() - 1;
                 temp = new ArrayDeque<>();
                 for (; dumpStartIdx <= dumpEndIdx; dumpStartIdx++) {
-                    temp.add(data.get(dumpStartIdx));
+                    temp.add(getData().get(dumpStartIdx));
                 }
             }
 
@@ -531,7 +531,7 @@ public class LineGraph extends GridPane {
                 dumpRunnable.run();
                 executorTerminator.shutdown();
                 executorTerminator = Executors.newSingleThreadScheduledExecutor(terminatorThreadFactory);
-            }, 1000, TimeUnit.MILLISECONDS);
+            }, 1700, TimeUnit.MILLISECONDS);
         }
     }
 
@@ -1172,5 +1172,12 @@ public class LineGraph extends GridPane {
     public final void setWidthPerSec(double widthPerSec) {
         this.widthPerSec = widthPerSec;
         widthPerMs = widthPerSec / 1000;
+    }
+
+    /**
+     * @return the data
+     */
+    public ArrayList<Object[]> getData() {
+        return data;
     }
 }
