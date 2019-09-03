@@ -77,11 +77,10 @@ import javafx.scene.text.Font;
  */
 public class LineGraph extends GridPane {
     
-    class Field {
-        boolean showData;
-        CheckBox cbData;
-        Label txtData;
-        Paint color;
+    public class Field {
+        public CheckBox cbData;
+        public Label txtData;
+        public Paint color;
     }
 
     static final int CLEAR_DATA_MS = 5 * 60 * 1000; // 5 menit
@@ -314,6 +313,22 @@ public class LineGraph extends GridPane {
         fxTimer.start();
     }
     
+    public void setScale(float yMin1, float yMax1, float yUnitTick1, float xUnitTick1, float widthPerSec1) {
+        setyMin(yMin1);
+        setyMax(yMax1);
+        setyUnitTick(yUnitTick1);
+        setxUnitTick(xUnitTick1);
+        setWidthPerSec(widthPerSec1);
+    }
+    
+    public void start() {
+        fxTimer.start();
+    }
+    
+    public void stop() {
+        fxTimer.stop();
+    }
+    
     //public void setIsDrawChartOnSave(boolean isDrawChartOnSave) {
     //    this.isDrawChartOnSave = isDrawChartOnSave;
     //}
@@ -456,15 +471,13 @@ public class LineGraph extends GridPane {
             boolean autoscaleChanged = false;
             
             for (int i = 0; i < nFields; i++) {
-                if (fields[i].showData) {
-                    if ((float) datum[i + 1] < dataYMin) {
-                        dataYMin = (float) datum[i + 1];
-                        autoscaleChanged = true;
-                    }
-                    if ((float) datum[i + 1] > dataYMax) {
-                        dataYMax = (float) datum[i + 1];
-                        autoscaleChanged = true;
-                    }
+                if ((float) datum[i + 1] < dataYMin) {
+                    dataYMin = (float) datum[i + 1];
+                    autoscaleChanged = true;
+                }
+                if ((float) datum[i + 1] > dataYMax) {
+                    dataYMax = (float) datum[i + 1];
+                    autoscaleChanged = true;
                 }
             }
             
@@ -554,9 +567,8 @@ public class LineGraph extends GridPane {
         }
     }
     
-    public void saveData(final long from, final long to, final boolean csv,
-            final Consumer<Object> progressConsumer, final String path,
-            final String... headers) {
+    public void saveData(final long from, final long to, final Consumer<Object[]> dataConsumer,
+            final Consumer<Object> progressConsumer, final String path, final String... headers) {
         Thread t = new Thread(() -> {
             fxTimer.stop();
             isSaving = true;
@@ -565,19 +577,15 @@ public class LineGraph extends GridPane {
                 if (f.exists()) {
                     throw new Exception("Saving failed: File exists");
                 }
-                FileWriter fw = null;
-                
-                if (csv) {
-                    fw = new FileWriter(f);
-                    if (headers != null) {
-                        for (int index = 0; index < headers.length; index++) {
-                            if (index != 0) {
-                                fw.write(",");
-                            }
-                            fw.write(headers[index]);
+                FileWriter fw = new FileWriter(f);
+                if (headers != null) {
+                    for (int index = 0; index < headers.length; index++) {
+                        if (index != 0) {
+                            fw.write(",");
                         }
-                        fw.write("\r\n");
+                        fw.write(headers[index]);
                     }
+                    fw.write("\r\n");
                 }
                 
                 ArrayList<Object[]> tempData = new ArrayList<>();
@@ -594,25 +602,29 @@ public class LineGraph extends GridPane {
                         final FileWriter fw1 = fw;
                         final int counter0 = counter;
                         final long total0 = total;
-                        total += loadCacheData(from, to, (Object[] tmp) -> {
-                            if (csv && fw1 != null) {
-                                try {
-                                    int counter1 = (int)tmp[0];
-                                    long total1 = (long)tmp[1];
-                                    Object[] datum = (Object[])tmp[2];
+                        long cacheCount = loadCacheData(from, to, (Object[] tmp) -> {
+                            try {
+                                int counter1 = (int)tmp[0];
+                                long total1 = (long)tmp[1];
+                                Object[] datum = (Object[])tmp[2];
 
-                                    long timestamp = (long)datum[0];
-                                    fw1.write((long)datum[0] + ",");
-                                    for (int i = 1; i < datum.length; i++)
-                                        fw1.write((float)datum[i] + ",");
+                                long timestamp = (long)datum[0];
+                                fw1.write((long)datum[0] + ",");
+                                for (int i = 1; i < datum.length; i++)
+                                    fw1.write((float)datum[i] + ",");
 
-                                    if (progressConsumer != null)
-                                        progressConsumer.accept((double) (counter1 + counter0) / (total0 + total1));
-                                } catch (IOException ex) {
-                                    Logger.getLogger(LineGraph.class.getName()).log(Level.SEVERE, null, ex);
-                                }
+                                if (dataConsumer != null)
+                                    dataConsumer.accept(datum);
+
+                                if (progressConsumer != null)
+                                    progressConsumer.accept((double) (counter1 + counter0) / (total0 + total1));
+
+                            } catch (IOException ex) {
+                                Logger.getLogger(LineGraph.class.getName()).log(Level.SEVERE, null, ex);
                             }
                         });
+                        total += cacheCount;
+                        counter += cacheCount;
                     }
                 }
                 
@@ -628,11 +640,14 @@ public class LineGraph extends GridPane {
                         continue;
                     }
                     
-                    if (csv && fw != null) {
-                        fw.write(row[0].toString() + ",");
-                        for (int j = 1; j < row.length; j++)
-                            fw.write(row[j].toString() + ",");
+                    fw.write(row[0].toString() + ",");
+                    for (int j = 1; j < row.length; j++)
+                        fw.write(row[j].toString() + ",");
+                    
+                    if (dataConsumer != null) {
+                        dataConsumer.accept(row);
                     }
+                    
                     counter++;
                     if (total <= 0)
                         total = 1;
@@ -641,8 +656,7 @@ public class LineGraph extends GridPane {
                     }
                     i++;
                 }
-                if (csv && fw != null)
-                    fw.close();
+                fw.close();
                 
                 if (progressConsumer != null) {
                     progressConsumer.accept((double) 1);
@@ -848,9 +862,6 @@ public class LineGraph extends GridPane {
             if (!fields[i].cbData.isSelected()) {
                 continue;
             }
-            if (!fields[i].showData) {
-                continue;
-            }
 
             gc.setStroke(fields[i].color);
             Iterator<float[]> it = toDraw.iterator();
@@ -961,8 +972,6 @@ public class LineGraph extends GridPane {
                 p.setPrefWidth(10);
                 l.setGraphic(p);
                 fields[i].txtData = l;
-                
-                fields[i].showData = true;
             }
             updateDataShow();
             setDefaultStyle();
@@ -1179,5 +1188,26 @@ public class LineGraph extends GridPane {
      */
     public ArrayList<Object[]> getData() {
         return data;
+    }
+    
+    /**
+     * @param enable set enabled or not
+     */
+    public void setAutoscale(boolean enable) {
+        cbAutoscale.setSelected(enable);
+    }
+    
+    /**
+     * @return is autoscale enabled
+     */
+    public boolean isAutoscale() {
+        return cbAutoscale.isSelected();
+    }
+
+    /**
+     * @return the fields
+     */
+    public Field[] getFields() {
+        return fields;
     }
 }

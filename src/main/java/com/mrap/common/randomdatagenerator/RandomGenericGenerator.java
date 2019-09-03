@@ -55,6 +55,10 @@ public class RandomGenericGenerator<T> extends RandomDataGenerator {
     public RandomGenericGenerator(int freq, Object[][] minmax) {
         this(freq, (T)new float[3], minmax);
     }
+    
+    public RandomGenericGenerator(int freq, T dataInstance) {
+        this(freq, dataInstance, new Object[][] {DEFAULT_MINMAX});
+    }
 
     public RandomGenericGenerator(int freq) {
         this(freq, new Object[][]{

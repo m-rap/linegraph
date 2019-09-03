@@ -24,6 +24,7 @@
 package com.mrap.common.randomdatagenerator;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -72,6 +73,14 @@ public abstract class RandomDataGenerator<T> {
         for (int i = 0; i < count; i++) {
             consumer.accept(nextRandom());
         }
+    }
+    
+    public ArrayList<T> nextMsRandoms(long ms) {
+        ArrayList<T> list = new ArrayList<>();
+        nextMsRandoms(ms, (T t) -> {
+            list.add(t);
+        });
+        return list;
     }
     
     protected float nextFloatSeries(float min, float max, float prev, float range) {
