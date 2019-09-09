@@ -3,10 +3,11 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.mrap.linegraph;
+package com.mrap.linegraph.examples;
 
 import com.mrap.common.randomdatagenerator.*;
 import com.mrap.common.*;
+import com.mrap.linegraph.LineGraph;
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.Arrays;

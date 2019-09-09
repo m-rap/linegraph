@@ -76,7 +76,7 @@ import javafx.scene.text.Font;
  * @author software
  */
 public class LineGraph extends GridPane {
-    
+
     public class Field {
         public CheckBox cbData;
         public Label txtData;
@@ -111,6 +111,8 @@ public class LineGraph extends GridPane {
     @FXML
     CheckBox cbAutoscale;
     
+    private final Object dataLock = new Object();
+    
     private int nFields = -1;
     private Field[] fields;
     
@@ -136,7 +138,7 @@ public class LineGraph extends GridPane {
     private double widthPerMs;
     
     float autoYMin, autoYMax;
-    private final ArrayList<Object[]> data;
+    private ArrayList<Object[]> data;
     GraphicsContext gc;
     private double lineWidth;
     
@@ -456,50 +458,24 @@ public class LineGraph extends GridPane {
             x += (xUnitTick * 1000);
         }
     }
+    
+    public void setData(ArrayList<Object[]> data) {
+        resetData();
+        synchronized (dataLock) {
+            this.data = data;
+            for (Object[] datum : data) {
+                addDataInternal(datum, true);
+            }
+        }
+    }
 
     public void addData(Object... datum) {
         if (isSaving) {
             return;
         }
         
-        synchronized (data) {
-            if (startMs == -1) {
-                startMs = (long) datum[0];
-            }
-            
-            data.add(datum);
-            boolean autoscaleChanged = false;
-            
-            for (int i = 0; i < nFields; i++) {
-                if ((float) datum[i + 1] < dataYMin) {
-                    dataYMin = (float) datum[i + 1];
-                    autoscaleChanged = true;
-                }
-                if ((float) datum[i + 1] > dataYMax) {
-                    dataYMax = (float) datum[i + 1];
-                    autoscaleChanged = true;
-                }
-            }
-            
-            if (autoscaleChanged) {
-                autoYUnitTick = dataYMax - dataYMin;
-                if (autoYUnitTick <= MIN_AUTOTICK / autoTickCount)
-                    autoYUnitTick = MIN_AUTOTICK;
-                autoYUnitTick /= autoTickCount;
-                if (autoYUnitTick < 1.0f) {
-                    float scale = 1.0f / autoYUnitTick;
-                    autoYUnitTick = Math.round(autoYUnitTick * scale) / scale;
-                    autoYMin = dataYMin - autoYUnitTick;
-                    autoYMin = (float)Math.floor(autoYMin * scale) / scale;
-                    autoYMax = dataYMax + autoYUnitTick;
-                    autoYMax = (float)Math.ceil(autoYMax * scale) / scale;
-                } else {
-                    autoYUnitTick = Math.round(autoYUnitTick);
-                    autoYMin = (float)Math.floor(dataYMin - autoYUnitTick);
-                    autoYMax = (float)Math.ceil(dataYMax + autoYUnitTick);
-                }
-                
-            }
+        synchronized (dataLock) {
+            addDataInternal(datum);
 
             long timeLength, a = 0, b = 0;
             try {
@@ -547,6 +523,50 @@ public class LineGraph extends GridPane {
             }, 1700, TimeUnit.MILLISECONDS);
         }
     }
+    
+    private void addDataInternal(Object[] datum) {
+        addDataInternal(datum, false);
+    }
+
+    private void addDataInternal(Object[] datum, boolean simulate) {
+        if (startMs == -1) {
+            startMs = (long) datum[0];
+        }
+        
+        if (!simulate)
+            data.add(datum);
+        boolean autoscaleChanged = false;
+        
+        for (int i = 0; i < nFields; i++) {
+            if ((float) datum[i + 1] < dataYMin) {
+                dataYMin = (float) datum[i + 1];
+                autoscaleChanged = true;
+            }
+            if ((float) datum[i + 1] > dataYMax) {
+                dataYMax = (float) datum[i + 1];
+                autoscaleChanged = true;
+            }
+        }
+        
+        if (autoscaleChanged) {
+            autoYUnitTick = dataYMax - dataYMin;
+            if (autoYUnitTick <= MIN_AUTOTICK / autoTickCount)
+                autoYUnitTick = MIN_AUTOTICK;
+            autoYUnitTick /= autoTickCount;
+            if (autoYUnitTick < 1.0f) {
+                float scale = 1.0f / autoYUnitTick;
+                autoYUnitTick = Math.round(autoYUnitTick * scale) / scale;
+                autoYMin = dataYMin - autoYUnitTick;
+                autoYMin = (float)Math.floor(autoYMin * scale) / scale;
+                autoYMax = dataYMax + autoYUnitTick;
+                autoYMax = (float)Math.ceil(autoYMax * scale) / scale;
+            } else {
+                autoYUnitTick = Math.round(autoYUnitTick);
+                autoYMin = (float)Math.floor(dataYMin - autoYUnitTick);
+                autoYMax = (float)Math.ceil(dataYMax + autoYUnitTick);
+            }
+        }
+    }
 
     public void log(String msg) {
         try {
@@ -591,7 +611,7 @@ public class LineGraph extends GridPane {
                 ArrayList<Object[]> tempData = new ArrayList<>();
                 long total;
                 int counter = 0;
-                synchronized (data) {
+                synchronized (dataLock) {
                     tempData.addAll(data.subList(dumpedEndIdx + 1, data.size()));
                 }
                 synchronized (fileDumpLock) {
@@ -681,7 +701,7 @@ public class LineGraph extends GridPane {
                 Logger.getLogger(LineGraph.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
-        synchronized (data) {
+        synchronized (dataLock) {
             data.clear();
             startMs = -1;
             dataYMin = Float.MAX_VALUE;
@@ -742,7 +762,7 @@ public class LineGraph extends GridPane {
     ArrayDeque<float[]> createToDraw(long[] showStartEnd) {
         ArrayDeque<float[]> toDraw = new ArrayDeque<>();
         long showStart0, start, end, showEnd;
-        synchronized (data) {
+        synchronized (dataLock) {
             showStart0 = showStart;
             start = (!data.isEmpty()) ? (long) data.get(0)[0] : 0;
             end = (!data.isEmpty()) ? (long) data.get(data.size() - 1)[0] : 0;
@@ -952,7 +972,7 @@ public class LineGraph extends GridPane {
      * @param nFields the nFields to set
      */
     public final void setnFields(int nFields) {
-        synchronized (data) {
+        synchronized (dataLock) {
             if (!data.isEmpty())
                 return;
             this.nFields = nFields;
@@ -1070,7 +1090,7 @@ public class LineGraph extends GridPane {
         if (useHeader) {
             sc.nextLine();
         }
-        synchronized (data) {
+        synchronized (dataLock) {
             while (sc.hasNextLine()) {
                 try {
                     String[] valStr = sc.nextLine().split(",");
@@ -1105,7 +1125,7 @@ public class LineGraph extends GridPane {
     
     public Object[] get(int idx) {
         Object[] result = null;
-        synchronized (data) {
+        synchronized (dataLock) {
             if (!data.isEmpty())
                 result = data.get(idx >= 0 ? idx : data.size() + idx);
         }

@@ -21,8 +21,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package com.mrap.linegraph;
+package com.mrap.linegraph.examples;
 
+import com.mrap.linegraph.LineGraph;
 import com.mrap.linegraph.LineGraph;
 import com.mrap.linegraph.LineGraph;
 import javafx.application.Application;
