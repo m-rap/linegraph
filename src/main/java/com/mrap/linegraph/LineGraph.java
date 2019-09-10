@@ -460,7 +460,7 @@ public class LineGraph extends GridPane {
     }
     
     public void setData(ArrayList<Object[]> data) {
-        resetData();
+        resetIndices();
         synchronized (dataLock) {
             this.data = data;
             for (Object[] datum : data) {
@@ -703,19 +703,23 @@ public class LineGraph extends GridPane {
         }
         synchronized (dataLock) {
             data.clear();
-            startMs = -1;
-            dataYMin = Float.MAX_VALUE;
-            dataYMax = Float.MIN_VALUE;
-            autoYUnitTick = 1;
-            currIdx = 0;
-            dumpedSize = 0;
-            dumpedEndIdx = -1;
-            dumpStartIdx = 0;
-            dumpEndIdx = -1;
-            scrollBarLocked = false;
-            showStart = -1;
-            autoTickCount = DEFAULT_TICK_COUNT;
+            resetIndices();
         }
+    }
+    
+    private void resetIndices() {
+        startMs = -1;
+        dataYMin = Float.MAX_VALUE;
+        dataYMax = Float.MIN_VALUE;
+        autoYUnitTick = 1;
+        currIdx = 0;
+        dumpedSize = 0;
+        dumpedEndIdx = -1;
+        dumpStartIdx = 0;
+        dumpEndIdx = -1;
+        scrollBarLocked = false;
+        showStart = -1;
+        autoTickCount = DEFAULT_TICK_COUNT;
     }
 
     @FXML
