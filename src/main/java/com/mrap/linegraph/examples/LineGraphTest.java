@@ -114,7 +114,7 @@ public class LineGraphTest extends Application {
         
         lineGraphs = new LineGraph[lineGraphCount];
         for (int i = 0; i < lineGraphCount; i++) {
-            lineGraphs[i] = new LineGraph(-5f, 5f, 1, 1, 300);
+            lineGraphs[i] = new LineGraph(-5f, 5f, 1, 1, 1, 300);
             debugLabel.trackField(lineGraphs[i].getData(), "size");
         }
         

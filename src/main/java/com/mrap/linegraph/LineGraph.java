@@ -113,7 +113,7 @@ public class LineGraph extends GridPane {
     
     private final Object dataLock = new Object();
     
-    private int nFields = -1;
+    private int fieldCount = -1;
     private Field[] fields;
     
     float dataYMin = Float.MAX_VALUE, dataYMax = Float.MIN_VALUE, autoYUnitTick = 1;
@@ -164,7 +164,11 @@ public class LineGraph extends GridPane {
         public void handle(long now) {
             if (!isVisible() || getParent() == null)
                 return;
-            display();
+            try {
+                display();
+            } catch (Exception ex) {
+                Logger.getLogger(LineGraph.class.getName()).log(Level.SEVERE, null, ex);
+            }
         }
     };
     
@@ -215,14 +219,14 @@ public class LineGraph extends GridPane {
                         FileOutputStream fos = new FileOutputStream(file, true);
                         ByteBuffer buff = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN);
                         if (firstCreate) {
-                            buff.putInt(nFields);
+                            buff.putInt(fieldCount);
                             fos.write(buff.array());
                         }
-                        buff = ByteBuffer.allocate(8 + 4 * nFields).order(ByteOrder.LITTLE_ENDIAN);
+                        buff = ByteBuffer.allocate(8 + 4 * fieldCount).order(ByteOrder.LITTLE_ENDIAN);
                         for (Object[] datum : temp) {
                             buff.position(0);
                             buff.putLong((long) datum[0]);
-                            for (int i = 0; i < nFields; i++)
+                            for (int i = 0; i < fieldCount; i++)
                                 buff.putFloat((float) datum[i + 1]);
                             fos.write(buff.array());
                         }
@@ -259,14 +263,14 @@ public class LineGraph extends GridPane {
     }
 
     public LineGraph() {
-        this(-5, 5, 1, 1, 20);
+        this(-5, 5, 1, 1, 0, 20);
     }
 
-    public LineGraph(float yMin1, float yMax1, float yUnitTick1, float xUnitTick1, float widthPerSec1) {
-        this(yMin1, yMax1, yUnitTick1, xUnitTick1, widthPerSec1, new ArrayList<Object[]>());
+    public LineGraph(float yMin1, float yMax1, float yUnitTick1, float xUnitTick1, int nfields, float widthPerSec1) {
+        this(yMin1, yMax1, yUnitTick1, xUnitTick1, widthPerSec1, nfields, new ArrayList<Object[]>());
     }
     
-    public LineGraph(float yMin1, float yMax1, float yUnitTick1, float xUnitTick1, float widthPerSec1, ArrayList<Object[]> data1) {
+    public LineGraph(float yMin1, float yMax1, float yUnitTick1, float xUnitTick1, float widthPerSec1, int nfields, ArrayList<Object[]> data1) {
         try {
             FXMLLoader loader = new FXMLLoader(LineGraph.class.getResource("/fxml/LineGraph.fxml"));
             loader.setRoot(this);
@@ -280,7 +284,7 @@ public class LineGraph extends GridPane {
         autoTickCount = DEFAULT_TICK_COUNT;
         sdf = new SimpleDateFormat("yyyyMMdd_HHmmss");
         
-        setnFields(3);
+        setFieldCount(nfields);
         setyMin(yMin1);
         setyMax(yMax1);
         setyUnitTick(yUnitTick1);
@@ -460,8 +464,8 @@ public class LineGraph extends GridPane {
     }
     
     public void setData(ArrayList<Object[]> data) {
-        resetIndices();
         synchronized (dataLock) {
+            resetIndices();
             this.data = data;
             for (Object[] datum : data) {
                 addDataInternal(datum, true);
@@ -535,9 +539,10 @@ public class LineGraph extends GridPane {
         
         if (!simulate)
             data.add(datum);
+        
         boolean autoscaleChanged = false;
         
-        for (int i = 0; i < nFields; i++) {
+        for (int i = 0; i < datum.length - 1; i++) {
             if ((float) datum[i + 1] < dataYMin) {
                 dataYMin = (float) datum[i + 1];
                 autoscaleChanged = true;
@@ -820,6 +825,9 @@ public class LineGraph extends GridPane {
             
             for (int tempCurrIdx = currIdx; tempCurrIdx < data.size(); tempCurrIdx++) {
                 Object[] datum = data.get(tempCurrIdx);
+                if (fieldCount == 0) {
+                    setFieldCount(datum.length - 1);
+                }
                 ts = (long) datum[0] - start;
                 float scaledX = (float) Math.floor(ts * widthPerMs);
                 
@@ -828,15 +836,19 @@ public class LineGraph extends GridPane {
                 }
                 prevX = (int) scaledX;
                     
-                float[] toDrawEl = new float[nFields + 1];
+                float[] toDrawEl = new float[fieldCount + 1];
                 toDrawEl[0] = scaledX - startPx;
-                for (int i = 0; i < datum.length - 1; i++) {
+                int i;
+                for (i = 0; i < datum.length - 1; i++) {
                     if (!fields[i].cbData.isSelected()) {
                         continue;
                     }
                     float scaledY = -((float) datum[i + 1] - tmpYMax) *
                             (float) canvas.getHeight() / (tmpYMax - tmpYMin);
                     toDrawEl[i + 1] = scaledY;
+                }
+                for (; i < fieldCount; i++) {
+                    toDrawEl[i + 1] = 0;
                 }
                 toDraw.add(toDrawEl);
                 
@@ -850,6 +862,11 @@ public class LineGraph extends GridPane {
     }
 
     void display() {
+        synchronized (dataLock) {
+            if (fields == null)
+                return;
+        }
+        
         long[] showStartEnd = new long[2];
         ArrayDeque<float[]> toDraw = createToDraw(showStartEnd);
         long showStart0 = showStartEnd[0], showEnd = showStartEnd[1];
@@ -882,7 +899,7 @@ public class LineGraph extends GridPane {
         drawAxisX(showStart0, showEnd);
 
         gc.setLineWidth(lineWidth);
-        for (int i = 0; i < nFields; i++) {
+        for (int i = 0; i < fieldCount; i++) {
             if (!fields[i].cbData.isSelected()) {
                 continue;
             }
@@ -966,28 +983,26 @@ public class LineGraph extends GridPane {
     }
 
     /**
-     * @return the nFields
+     * @return the fieldCount
      */
-    public int getnFields() {
-        return nFields;
+    public int getFieldCount() {
+        return fieldCount;
     }
 
     /**
-     * @param nFields the nFields to set
+     * @param fieldCount the fieldCount to set
      */
-    public final void setnFields(int nFields) {
+    public void setFieldCount(int fieldCount) {
         synchronized (dataLock) {
-            if (!data.isEmpty())
-                return;
-            this.nFields = nFields;
-            fields = new Field[nFields];
-            for (int i = 0; i < nFields; i++) {
+            this.fieldCount = fieldCount;
+            fields = new Field[fieldCount];
+            for (int i = 0; i < fieldCount; i++) {
                 fields[i] = new Field();
-                
+
                 CheckBox cb = new CheckBox();
                 cb.setSelected(true);
                 fields[i].cbData = cb;
-                
+
                 Label l =  new Label(i < 3 ? DEFAULT_NAMES[i] : "");
                 Pane p = new Pane();
                 p.getStyleClass().add("default-color" + (i%8));
@@ -999,6 +1014,34 @@ public class LineGraph extends GridPane {
             }
             updateDataShow();
             setDefaultStyle();
+        }
+    }
+    
+    /**
+     * @return the names
+     */
+    public String[] getFieldNames() {
+        synchronized (dataLock) {
+            if (fields == null)
+                return new String[0];
+            String[] names = new String[fields.length];
+            for (int i = 0; i < fields.length; i++) {
+                names[i] = fields[i].txtData.getText();
+            }
+            return names;
+        }
+    }
+
+    /**
+     * @param names the fieldNames to set
+     */
+    public final void setFieldNames(String[] names) {
+        synchronized (dataLock) {
+            if (fields == null)
+                return;
+            for (int i = 0; i < fields.length; i++) {
+                fields[i].txtData.setText(names[i]);
+            }
         }
     }
 
