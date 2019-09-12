@@ -130,10 +130,10 @@ public class LineGraph extends GridPane {
     private float autoTickCount = DEFAULT_TICK_COUNT;
 
     Rectangle scrollRect;
-    private float yMin;
-    private float yMax;
-    private float yUnitTick;
-    private float xUnitTick;
+    private double minY;
+    private double maxY;
+    private double unitTickY;
+    private double unitTickX;
     private double widthPerSec;
     private double widthPerMs;
     
@@ -270,7 +270,7 @@ public class LineGraph extends GridPane {
         this(yMin1, yMax1, yUnitTick1, xUnitTick1, widthPerSec1, nfields, new ArrayList<Object[]>());
     }
     
-    public LineGraph(float yMin1, float yMax1, float yUnitTick1, float xUnitTick1, float widthPerSec1, int nfields, ArrayList<Object[]> data1) {
+    public LineGraph(float minY1, float maxY1, float unitTickY1, float unitTickX1, float widthPerSec1, int nfields, ArrayList<Object[]> data1) {
         try {
             FXMLLoader loader = new FXMLLoader(LineGraph.class.getResource("/fxml/LineGraph.fxml"));
             loader.setRoot(this);
@@ -285,10 +285,10 @@ public class LineGraph extends GridPane {
         sdf = new SimpleDateFormat("yyyyMMdd_HHmmss");
         
         setFieldCount(nfields);
-        setyMin(yMin1);
-        setyMax(yMax1);
-        setyUnitTick(yUnitTick1);
-        setxUnitTick(xUnitTick1);
+        setMinY(minY1);
+        setMaxY(maxY1);
+        setUnitTickY(unitTickY1);
+        setUnitTickX(unitTickX1);
         setWidthPerSec(widthPerSec1);
         
         scrollRect = (Rectangle) scrollBar.getChildren().get(0);
@@ -320,10 +320,10 @@ public class LineGraph extends GridPane {
     }
     
     public void setScale(float yMin1, float yMax1, float yUnitTick1, float xUnitTick1, float widthPerSec1) {
-        setyMin(yMin1);
-        setyMax(yMax1);
-        setyUnitTick(yUnitTick1);
-        setxUnitTick(xUnitTick1);
+        setMinY(yMin1);
+        setMaxY(yMax1);
+        setUnitTickY(yUnitTick1);
+        setUnitTickX(xUnitTick1);
         setWidthPerSec(widthPerSec1);
     }
     
@@ -386,19 +386,19 @@ public class LineGraph extends GridPane {
         yRuler.getChildren().clear();
         gc.setLineWidth(0.5);
         gc.setStroke(Paint.valueOf("#989898"));
-        float tmpYMin, tmpYMax, tmpYUnitTick;
+        double tmpYMin, tmpYMax, tmpYUnitTick;
         if (cbAutoscale.isSelected() && dataYMin < Float.MAX_VALUE) {
             tmpYMin = autoYMin;
             tmpYMax = autoYMax;
             tmpYUnitTick = autoYUnitTick;
         } else {
-            tmpYMin = yMin;
-            tmpYMax = yMax;
-            tmpYUnitTick = yUnitTick;
+            tmpYMin = minY;
+            tmpYMax = maxY;
+            tmpYUnitTick = unitTickY;
         }
-        float y = (int) (tmpYMin / tmpYUnitTick) * tmpYUnitTick + tmpYUnitTick;
+        double y = (int) (tmpYMin / tmpYUnitTick) * tmpYUnitTick + tmpYUnitTick;
         for (; y <= tmpYMax; y += tmpYUnitTick) {
-            float actualY = tmpYMax - y;
+            double actualY = tmpYMax - y;
             double scaledActualY = actualY * height / (tmpYMax - tmpYMin);
             if (gridPane.getChildren().contains(yRuler)) {
                 Label text;
@@ -406,7 +406,7 @@ public class LineGraph extends GridPane {
                     text = lbls.pop();
                 else
                     text = new Label();
-                if (tmpYUnitTick < 1.0f)
+                if (tmpYUnitTick - Math.floor(tmpYUnitTick) > 0.001)
                     text.setText(DF.format(y));
                 else
                     text.setText(String.format("%.0f", y));
@@ -430,7 +430,7 @@ public class LineGraph extends GridPane {
             if (n instanceof Label && !lbls.contains((Label)n))
                 lbls.add((Label)n);
         xRuler.getChildren().clear();
-        long x = (long) ((float) Math.ceil(showStart / (xUnitTick * 1000)) * xUnitTick * 1000);
+        long x = (long) ((float) Math.ceil(showStart / (unitTickX * 1000)) * unitTickX * 1000);
         double y2 = canvas.getHeight();
         while (x < showEnd) {
             double scaledActualX = (x - showStart) * widthPerMs;
@@ -441,10 +441,16 @@ public class LineGraph extends GridPane {
                     text = lbls.pop();
                 else
                     text = new Label();
+                float displayX;
                 if (startMs == -1) {
-                    text.setText("" + (x / 1000));
+                    displayX = (float)x / 1000;
                 } else {
-                    text.setText("" + ((x + ((long) data.get(0)[0] - startMs)) / 1000));
+                    displayX = (float)(x + ((long) data.get(0)[0] - startMs)) / 1000;
+                }
+                if (unitTickX - Math.floor(unitTickX) > 0.001) {
+                    text.setText(DF.format(displayX));
+                } else {
+                    text.setText(String.format("%.0f", displayX));
                 }
                 text.setFont(AXIS_FONT);
                 text.applyCss();
@@ -459,7 +465,7 @@ public class LineGraph extends GridPane {
                     xRuler.getChildren().remove(text);
                 }
             }
-            x += (xUnitTick * 1000);
+            x += (unitTickX * 1000);
         }
     }
     
@@ -797,13 +803,13 @@ public class LineGraph extends GridPane {
             int prevX = Integer.MIN_VALUE;
             long ts;
             
-            float tmpYMin, tmpYMax;
+            double tmpYMin, tmpYMax;
             if (cbAutoscale.isSelected() && dataYMin < Float.MAX_VALUE) {
                 tmpYMin = autoYMin;
                 tmpYMax = autoYMax;
             } else {
-                tmpYMin = yMin;
-                tmpYMax = yMax;
+                tmpYMin = minY;
+                tmpYMax = maxY;
             }
             
             for (; currIdx >= 0; currIdx--) {
@@ -843,8 +849,8 @@ public class LineGraph extends GridPane {
                     if (!fields[i].cbData.isSelected()) {
                         continue;
                     }
-                    float scaledY = -((float) datum[i + 1] - tmpYMax) *
-                            (float) canvas.getHeight() / (tmpYMax - tmpYMin);
+                    float scaledY = -((float) datum[i + 1] - (float) tmpYMax) *
+                            (float) canvas.getHeight() / (float) (tmpYMax - tmpYMin);
                     toDrawEl[i + 1] = scaledY;
                 }
                 for (; i < fieldCount; i++) {
@@ -973,6 +979,14 @@ public class LineGraph extends GridPane {
     public boolean isShowLegendBox() {
         return showLegendBox;
     }
+    
+    public void setShowAutoscale(boolean showAutoScale) {
+        cbAutoscale.setVisible(showAutoScale);
+    }
+
+    public boolean isShowAutoscale() {
+        return cbAutoscale.isVisible();
+    }
 
     private void updateDataShow() {
         legendBox.getChildren().clear();
@@ -992,7 +1006,7 @@ public class LineGraph extends GridPane {
     /**
      * @param fieldCount the fieldCount to set
      */
-    public void setFieldCount(int fieldCount) {
+    public final void setFieldCount(int fieldCount) {
         synchronized (dataLock) {
             this.fieldCount = fieldCount;
             fields = new Field[fieldCount];
@@ -1020,27 +1034,35 @@ public class LineGraph extends GridPane {
     /**
      * @return the names
      */
-    public String[] getFieldNames() {
+    public String getFieldNames() {
         synchronized (dataLock) {
             if (fields == null)
-                return new String[0];
+                return "";
             String[] names = new String[fields.length];
             for (int i = 0; i < fields.length; i++) {
                 names[i] = fields[i].txtData.getText();
             }
-            return names;
+            return String.join(":", names);
         }
     }
 
     /**
      * @param names the fieldNames to set
      */
-    public final void setFieldNames(String[] names) {
+    public void setFieldNames(String names) {
         synchronized (dataLock) {
             if (fields == null)
                 return;
-            for (int i = 0; i < fields.length; i++) {
-                fields[i].txtData.setText(names[i]);
+            String[] namesArr = names.split(":");
+            int i;
+            for (i = 0; i < namesArr.length && i < fields.length; i++) {
+                fields[i].txtData.setText(namesArr[i]);
+            }
+            for (; i < DEFAULT_NAMES.length && i < fields.length; i++) {
+                fields[i].txtData.setText(DEFAULT_NAMES[i]);
+            }
+            for (; i < fields.length && i < fields.length; i++) {
+                fields[i].txtData.setText("");
             }
         }
     }
@@ -1182,57 +1204,57 @@ public class LineGraph extends GridPane {
     /**
      * @return the yMin
      */
-    public float getyMin() {
-        return yMin;
+    public double getMinY() {
+        return minY;
     }
 
     /**
-     * @param yMin the yMin to set
+     * @param minY the yMin to set
      */
-    public final void setyMin(float yMin) {
-        this.yMin = yMin;
+    public final void setMinY(double minY) {
+        this.minY = minY;
     }
 
     /**
-     * @return the yMax
+     * @return the maxY
      */
-    public float getyMax() {
-        return yMax;
+    public double getMaxY() {
+        return maxY;
     }
 
     /**
-     * @param yMax the yMax to set
+     * @param maxY the maxY to set
      */
-    public final void setyMax(float yMax) {
-        this.yMax = yMax;
+    public final void setMaxY(double maxY) {
+        this.maxY = maxY;
     }
 
     /**
-     * @return the yUnitTick
+     * @return the unitTickY
      */
-    public float getyUnitTick() {
-        return yUnitTick;
+    public double getUnitTickY() {
+        return unitTickY;
     }
 
     /**
-     * @param yUnitTick the yUnitTick to set
+     * @param unitTickY the unitTickY to set
      */
-    public final void setyUnitTick(float yUnitTick) {
-        this.yUnitTick = yUnitTick;
+    public final void setUnitTickY(double unitTickY) {
+        this.unitTickY = unitTickY;
     }
 
     /**
-     * @return the xUnitTick
+     * @return the unitTickX
      */
-    public float getxUnitTick() {
-        return xUnitTick;
+    public double getUnitTickX() {
+        return unitTickX;
     }
 
     /**
-     * @param xUnitTick the xUnitTick to set
+     * @param unitTickX the unitTickX to set
      */
-    public final void setxUnitTick(float xUnitTick) {
-        this.xUnitTick = xUnitTick;
+    public final void setUnitTickX(double unitTickX) {
+        this.unitTickX = unitTickX;
     }
 
     /**
