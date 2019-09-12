@@ -23,6 +23,7 @@
  */
 package com.mrap.linegraph;
 
+import com.sun.javafx.collections.ObservableListWrapper;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -39,6 +40,7 @@ import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.Scanner;
@@ -52,6 +54,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javafx.animation.AnimationTimer;
 import javafx.beans.value.ObservableValue;
+import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Node;
@@ -111,8 +114,6 @@ public class LineGraph extends GridPane {
     @FXML
     CheckBox cbAutoscale;
     
-    private final Object dataLock = new Object();
-    
     private int fieldCount = -1;
     private Field[] fields;
     
@@ -162,6 +163,8 @@ public class LineGraph extends GridPane {
     AnimationTimer fxTimer = new AnimationTimer() {
         @Override
         public void handle(long now) {
+            ObservableList<Object[]> test = new ObservableListWrapper<>(data);
+            
             if (!isVisible() || getParent() == null)
                 return;
             try {
@@ -185,25 +188,26 @@ public class LineGraph extends GridPane {
         public void run() {
             if (!enableDump)
                 return;
-            if (getData().isEmpty()) {
+            if (data.isEmpty()) {
                 return;
             }
-            if (dumpStartIdx >= getData().size() || dumpStartIdx < 0) {
+            if (dumpStartIdx >= data.size() || dumpStartIdx < 0) {
                 return;
             }
             
             isDumping = true;
             
+            final ArrayList<Object[]> dataFinal = data;
             ArrayDeque<Object[]> temp;
-            synchronized (getData()) {
-                long a = (long)getData().get(0)[0], b = (long)getData().get(getData().size() - 1)[0];
-                log("start dumping from " + (long)getData().get(dumpStartIdx)[0] + 
-                        ", current data size,start,end,length " + getData().size() + "," + a +
+            synchronized (dataFinal) {
+                long a = (long)dataFinal.get(0)[0], b = (long)getData().get(dataFinal.size() - 1)[0];
+                log("start dumping from " + (long)dataFinal.get(dumpStartIdx)[0] + 
+                        ", current data size,start,end,length " + dataFinal.size() + "," + a +
                         "," + b + "," + (b - a));
-                dumpEndIdx = getData().size() - 1;
+                dumpEndIdx = dataFinal.size() - 1;
                 temp = new ArrayDeque<>();
                 for (; dumpStartIdx <= dumpEndIdx; dumpStartIdx++) {
-                    temp.add(getData().get(dumpStartIdx));
+                    temp.add(dataFinal.get(dumpStartIdx));
                 }
             }
 
@@ -469,8 +473,8 @@ public class LineGraph extends GridPane {
         }
     }
     
-    public void setData(ArrayList<Object[]> data) {
-        synchronized (dataLock) {
+    public void setData(final ArrayList<Object[]> data) {
+        synchronized (data) {
             resetIndices();
             this.data = data;
             for (Object[] datum : data) {
@@ -483,24 +487,24 @@ public class LineGraph extends GridPane {
         if (isSaving) {
             return;
         }
-        
-        synchronized (dataLock) {
+        final ArrayList<Object[]> dataFinal = data;
+        synchronized (dataFinal) {
             addDataInternal(datum);
 
             long timeLength, a = 0, b = 0;
             try {
-                a = (long)data.get(0)[0];
+                a = (long)dataFinal.get(0)[0];
                 timeLength = (long) datum[0] - a;
-                b = enableDump ? (long)data.get(dumpStartIdx)[0] : 0;
+                b = enableDump ? (long)dataFinal.get(dumpStartIdx)[0] : 0;
                 if (timeLength >= CLEAR_DATA_MS * 2 && (!enableDump || timeLength / 2 < b - a)) {
-                    int dataToClearCount = data.size() / 2;
-                    data.subList(0, dataToClearCount).clear();
+                    int dataToClearCount = dataFinal.size() / 2;
+                    dataFinal.subList(0, dataToClearCount).clear();
 
                     if (enableDump)
                         dumpStartIdx -= dataToClearCount;
 
-                    b = (long)data.get(data.size() - 1)[0];
-                    log("old data dropped, current size,start,end,length " + data.size() + "," + a +
+                    b = (long)dataFinal.get(dataFinal.size() - 1)[0];
+                    log("old data dropped, current size,start,end,length " + dataFinal.size() + "," + a +
                         "," + b + "," + (b - a));
                 }
             } catch (Exception e) {
@@ -622,8 +626,9 @@ public class LineGraph extends GridPane {
                 ArrayList<Object[]> tempData = new ArrayList<>();
                 long total;
                 int counter = 0;
-                synchronized (dataLock) {
-                    tempData.addAll(data.subList(dumpedEndIdx + 1, data.size()));
+                final ArrayList<Object[]> dataFinal = data;
+                synchronized (dataFinal) {
+                    tempData.addAll(dataFinal.subList(dumpedEndIdx + 1, dataFinal.size()));
                 }
                 synchronized (fileDumpLock) {
                     total = tempData.size();
@@ -712,8 +717,9 @@ public class LineGraph extends GridPane {
                 Logger.getLogger(LineGraph.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
-        synchronized (dataLock) {
-            data.clear();
+        final ArrayList<Object[]> dataFinal = data;
+        synchronized (dataFinal) {
+            dataFinal.clear();
             resetIndices();
         }
     }
@@ -777,10 +783,11 @@ public class LineGraph extends GridPane {
     ArrayDeque<float[]> createToDraw(long[] showStartEnd) {
         ArrayDeque<float[]> toDraw = new ArrayDeque<>();
         long showStart0, start, end, showEnd;
-        synchronized (dataLock) {
+        final ArrayList<Object[]> dataFinal = data;
+        synchronized (dataFinal) {
             showStart0 = showStart;
-            start = (!data.isEmpty()) ? (long) data.get(0)[0] : 0;
-            end = (!data.isEmpty()) ? (long) data.get(data.size() - 1)[0] : 0;
+            start = (!dataFinal.isEmpty()) ? (long) dataFinal.get(0)[0] : 0;
+            end = (!dataFinal.isEmpty()) ? (long) dataFinal.get(dataFinal.size() - 1)[0] : 0;
             totalShowMs = (long) (canvas.getWidth() * 1000 / widthPerSec);
             totalMs = end - start + (long) ((float) totalShowMs * (1 - END_GAP));
             if (showStart == -1) {
@@ -794,7 +801,7 @@ public class LineGraph extends GridPane {
             showStartEnd[0] = showStart0;
             showStartEnd[1] = showEnd;
             
-            if (data.isEmpty())
+            if (dataFinal.isEmpty())
                 return toDraw;
             
             //debugStr = new StringBuilder().append(this.showStart).append(" ").
@@ -813,15 +820,15 @@ public class LineGraph extends GridPane {
             }
             
             for (; currIdx >= 0; currIdx--) {
-                Object[] datum = data.get(currIdx);
+                Object[] datum = dataFinal.get(currIdx);
                 ts = (long) datum[0] - start;
                 if (ts < showStart0)
                     break;
             }
             if (currIdx < 0) currIdx = 0;
             
-            for (; currIdx < data.size(); currIdx++) {
-                Object[] datum = data.get(currIdx);
+            for (; currIdx < dataFinal.size(); currIdx++) {
+                Object[] datum = dataFinal.get(currIdx);
                 ts = (long) datum[0] - start;
                 if (ts >= showStart0) {
                     break;
@@ -829,8 +836,8 @@ public class LineGraph extends GridPane {
             }
             if (currIdx > 0) currIdx--;
             
-            for (int tempCurrIdx = currIdx; tempCurrIdx < data.size(); tempCurrIdx++) {
-                Object[] datum = data.get(tempCurrIdx);
+            for (int tempCurrIdx = currIdx; tempCurrIdx < dataFinal.size(); tempCurrIdx++) {
+                Object[] datum = dataFinal.get(tempCurrIdx);
                 if (fieldCount == 0) {
                     setFieldCount(datum.length - 1);
                 }
@@ -868,7 +875,8 @@ public class LineGraph extends GridPane {
     }
 
     void display() {
-        synchronized (dataLock) {
+        ArrayList<Object[]> dataFinal = data;
+        synchronized (dataFinal) {
             if (fields == null)
                 return;
         }
@@ -1007,7 +1015,8 @@ public class LineGraph extends GridPane {
      * @param fieldCount the fieldCount to set
      */
     public final void setFieldCount(int fieldCount) {
-        synchronized (dataLock) {
+        final ArrayList<Object[]> dataFinal = data;
+        synchronized (dataFinal) {
             this.fieldCount = fieldCount;
             fields = new Field[fieldCount];
             for (int i = 0; i < fieldCount; i++) {
@@ -1035,7 +1044,8 @@ public class LineGraph extends GridPane {
      * @return the names
      */
     public String getFieldNames() {
-        synchronized (dataLock) {
+        final ArrayList<Object[]> dataFinal = data;
+        synchronized (dataFinal) {
             if (fields == null)
                 return "";
             String[] names = new String[fields.length];
@@ -1050,7 +1060,8 @@ public class LineGraph extends GridPane {
      * @param names the fieldNames to set
      */
     public void setFieldNames(String names) {
-        synchronized (dataLock) {
+        final ArrayList<Object[]> dataFinal = data;
+        synchronized (dataFinal) {
             if (fields == null)
                 return;
             String[] namesArr = names.split(":");
@@ -1159,7 +1170,9 @@ public class LineGraph extends GridPane {
         if (useHeader) {
             sc.nextLine();
         }
-        synchronized (dataLock) {
+        
+        final ArrayList<Object[]> dataFinal = data;
+        synchronized (dataFinal) {
             while (sc.hasNextLine()) {
                 try {
                     String[] valStr = sc.nextLine().split(",");
@@ -1194,9 +1207,10 @@ public class LineGraph extends GridPane {
     
     public Object[] get(int idx) {
         Object[] result = null;
-        synchronized (dataLock) {
-            if (!data.isEmpty())
-                result = data.get(idx >= 0 ? idx : data.size() + idx);
+        final ArrayList<Object[]> dataFinal = data;
+        synchronized (dataFinal) {
+            if (!dataFinal.isEmpty())
+                result = dataFinal.get(idx >= 0 ? idx : dataFinal.size() + idx);
         }
         return result;
     }
