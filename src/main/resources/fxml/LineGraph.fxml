@@ -11,7 +11,7 @@
 <?import javafx.scene.layout.RowConstraints?>
 <?import javafx.scene.shape.Rectangle?>
 
-<fx:root fx:id="gridPane" prefHeight="300.0" prefWidth="600.0" type="GridPane" xmlns="http://javafx.com/javafx/8.0.65" xmlns:fx="http://javafx.com/fxml/1">
+<fx:root fx:id="gridPane" prefHeight="300.0" prefWidth="600.0" styleClass="linegraph" stylesheets="@../styles/Styles_LineGraph.css" type="GridPane" xmlns="http://javafx.com/javafx/8.0.65" xmlns:fx="http://javafx.com/fxml/1">
    <columnConstraints>
       <ColumnConstraints hgrow="NEVER" maxWidth="1.7976931348623157E308" />
       <ColumnConstraints hgrow="SOMETIMES" maxWidth="1.7976931348623157E308" minWidth="10.0" />
@@ -30,11 +30,11 @@
       </ScrollPane>
       <HBox fx:id="legendBoxBase" alignment="CENTER" spacing="5.0" GridPane.columnIndex="1" GridPane.rowIndex="3">
          <children>
-            <HBox fx:id="legendBox" />
+            <HBox fx:id="legendBox" spacing="5.0" />
             <CheckBox fx:id="cbAutoscale" mnemonicParsing="false" text="Auto-scale" />
          </children>
          <padding>
-            <Insets top="5.0" />
+            <Insets bottom="3.0" left="3.0" right="3.0" top="3.0" />
          </padding>
       </HBox>
       <AnchorPane fx:id="yRuler" GridPane.rowIndex="1">

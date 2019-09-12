@@ -408,12 +408,10 @@ public class LineGraph extends GridPane {
                 Label text;
                 if (!lbls.isEmpty())
                     text = lbls.pop();
-                else
+                else {
                     text = new Label();
-                if (tmpYUnitTick - Math.floor(tmpYUnitTick) > 0.001)
-                    text.setText(DF.format(y));
-                else
-                    text.setText(String.format("%.0f", y));
+                }
+                text.setText(DF.format(y));
                 text.setFont(AXIS_FONT);
                 text.applyCss();
                 if (scaledActualY - 5 + text.getBoundsInLocal().getHeight() < yRuler.getBoundsInLocal().getHeight() &&
@@ -421,7 +419,7 @@ public class LineGraph extends GridPane {
                     AnchorPane.setBottomAnchor(text, null);
                     AnchorPane.setLeftAnchor(text, null);
                     AnchorPane.setTopAnchor(text, scaledActualY - 5);
-                    AnchorPane.setRightAnchor(text, 0.0);
+                    AnchorPane.setRightAnchor(text, 3.0);
                     yRuler.getChildren().add(text);
                 }
             }
@@ -451,18 +449,14 @@ public class LineGraph extends GridPane {
                 } else {
                     displayX = (float)(x + ((long) data.get(0)[0] - startMs)) / 1000;
                 }
-                if (unitTickX - Math.floor(unitTickX) > 0.001) {
-                    text.setText(DF.format(displayX));
-                } else {
-                    text.setText(String.format("%.0f", displayX));
-                }
+                text.setText(DF.format(displayX));
                 text.setFont(AXIS_FONT);
                 text.applyCss();
                 if (scaledActualX + text.getBoundsInLocal().getWidth() < xRuler.getWidth() &&
                         scaledActualX > 0) {
                     AnchorPane.setRightAnchor(text, null);
                     AnchorPane.setBottomAnchor(text, null);
-                    AnchorPane.setTopAnchor(text, 0.0);
+                    AnchorPane.setTopAnchor(text, 3.0);
                     AnchorPane.setLeftAnchor(text, scaledActualX);
                     xRuler.getChildren().add(text);
                 } else {
