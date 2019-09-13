@@ -1,4 +1,7 @@
 .linegraph {
-    -fx-background-color: white;
     -fx-padding: 3 6 3 3;
+}
+
+.linegraph, .linegraph .canvas, .linegraph .scroll-pane, .linegraph .scroll-pane > .viewport {
+    -fx-background-color: transparent;
 }
