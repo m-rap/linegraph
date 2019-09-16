@@ -7,10 +7,10 @@ package com.mrap.linegraph.examples;
 
 import com.mrap.common.randomdatagenerator.*;
 import com.mrap.common.*;
+import com.mrap.data.CacheableData;
 import com.mrap.linegraph.LineGraph;
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.logging.Level;
@@ -55,8 +55,11 @@ public class LineGraphTest extends Application {
     };
     final ArrayDeque<Object[]> toAdd = new ArrayDeque<>();
     
-    final ArrayList<Object[]> data1 = new ArrayList<>();
-    final ArrayList<Object[]> data2 = new ArrayList<>();
+//    final ArrayList<Object[]> data1 = new ArrayList<>();
+//    final ArrayList<Object[]> data2 = new ArrayList<>();
+    
+    final CacheableData data1 = new CacheableData();
+    final CacheableData data2 = new CacheableData();
     
     AnimationTimer lineChartTimer = new AnimationTimer() {
         @Override
@@ -96,7 +99,9 @@ public class LineGraphTest extends Application {
         
         randomGenerator1.listeners.add((RandomGeneratorListener<float[]>) (float[] result) -> {
             long ts = System.currentTimeMillis();
-            data1.add(new Object[] {ts, result[0], result[1], result[2]});
+            synchronized (data1) {
+                data1.add(new Object[] {ts, result[0], result[1], result[2]});
+            }
             //for (LineGraph l : lineGraphs)
             //    l.addData(ts, result[0], result[1], result[2]);
             if (enableLineChart) {
@@ -107,7 +112,9 @@ public class LineGraphTest extends Application {
         });
         randomGenerator2.listeners.add((RandomGeneratorListener<float[]>) (float[] result) -> {
             long ts = System.currentTimeMillis();
-            data2.add(new Object[] {ts, result[0], result[1], result[2]});
+            synchronized (data2) {
+                data2.add(new Object[] {ts, result[0], result[1], result[2]});
+            }
         });
         
         debugLabel.trackField(randomGenerator1, "fps");
@@ -150,8 +157,8 @@ public class LineGraphTest extends Application {
         saveBtn.setOnAction((ActionEvent event) -> {
             SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy-HHmmss");
             Date date;
-            if (lineGraphs[0].getStartMs() != -1) {
-                date = new Date(lineGraphs[0].getStartMs());
+            if (lineGraphs[0].getData().getStartMs() != -1) {
+                date = new Date(lineGraphs[0].getData().getStartMs());
             } else {
                 date = new Date();
             }
@@ -173,8 +180,9 @@ public class LineGraphTest extends Application {
             randomGenerator1.nextMsRandoms(900000, (Object res) -> {
                 long ts = (long)((double)counter[0]*(randomGenerator1.freq))+start;
                 float[] result = (float[])res;
-                for (LineGraph l : lineGraphs)
-                    l.addData(ts, result[0], result[1], result[2]);
+                data1.add(new Object[] {ts, result[0], result[1], result[2]});
+                //for (LineGraph l : lineGraphs)
+                //    l.addData(ts, result[0], result[1], result[2]);
                 counter[0]++;
             });
         });
@@ -185,8 +193,10 @@ public class LineGraphTest extends Application {
         });
         
         resetBtn.setOnAction((ActionEvent event) -> {
-            for (LineGraph l : lineGraphs)
-                l.resetData();
+            data1.clear();
+            data2.clear();
+            //for (LineGraph l : lineGraphs)
+            //    l.resetData();
         });
         
         switchBtn.setOnAction((ActionEvent event) -> {
@@ -203,6 +213,7 @@ public class LineGraphTest extends Application {
         primaryStage.setScene(new Scene(pane));
         primaryStage.setOnCloseRequest((WindowEvent event) -> {
             randomGenerator1.stop();
+            randomGenerator2.stop();
         });
         primaryStage.show();
     }
