@@ -66,6 +66,7 @@ public class LineGraph extends GridPane {
     static float MIN_AUTOTICK = 0.005f;
     final static float DEFAULT_TICK_COUNT = 5.0f;
     private static final String[] DEFAULT_NAMES = {"X", "Y", "Z"};
+    public static final float END_GAP = 0.9f;
 
     @FXML
     GridPane gridPane;
@@ -111,7 +112,6 @@ public class LineGraph extends GridPane {
     GraphicsContext gc;
     private double lineWidth;
     
-    private float END_GAP = 0.9f;
     private long totalShowMs;
     private long totalMs;
     final private Object lockScrollBar = new Object();
@@ -459,6 +459,10 @@ public class LineGraph extends GridPane {
             scrollRect.setTranslateX(x);
             showStart = (x >= xMax) ? -1 : (long) (x * totalMs / scrollBar.getWidth());
         }
+    }
+    
+    public long getTotalShowMs() {
+        return totalShowMs;
     }
     
     ArrayDeque<float[]> createToDraw(long[] showStartEnd) {

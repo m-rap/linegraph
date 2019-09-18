@@ -93,7 +93,7 @@ public class CacheableData extends ArrayList<Object[]> {
     private Runnable dumpRunnable = new Runnable() {
         @Override
         public void run() {
-            if (!enableDump)
+            if (!isEnableDump())
                 return;
             if (isEmpty()) {
                 return;
@@ -173,12 +173,12 @@ public class CacheableData extends ArrayList<Object[]> {
             try {
                 a = (long)get(0)[0];
                 timeLength = (long) datum[0] - a;
-                b = enableDump ? (long)get(dumpStartIdx)[0] : 0;
-                if (timeLength >= CLEAR_DATA_MS * 2 && (!enableDump || timeLength / 2 < b - a)) {
+                b = isEnableDump() ? (long)get(dumpStartIdx)[0] : 0;
+                if (timeLength >= CLEAR_DATA_MS * 2 && (!isEnableDump() || timeLength / 2 < b - a)) {
                     int dataToClearCount = size() / 2;
                     subList(0, dataToClearCount).clear();
 
-                    if (enableDump)
+                    if (isEnableDump())
                         dumpStartIdx -= dataToClearCount;
 
                     b = (long)get(size() - 1)[0];
@@ -516,5 +516,19 @@ public class CacheableData extends ArrayList<Object[]> {
                 totalLine[0]++;
             }
         }
+    }
+
+    /**
+     * @return the enableDump
+     */
+    public boolean isEnableDump() {
+        return enableDump;
+    }
+
+    /**
+     * @param enableDump the enableDump to set
+     */
+    public void setEnableDump(boolean enableDump) {
+        this.enableDump = enableDump;
     }
 }
