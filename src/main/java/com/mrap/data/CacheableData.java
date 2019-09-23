@@ -362,8 +362,12 @@ public class CacheableData extends ArrayList<Object[]> {
 
                                 long timestamp = (long)datum[0];
                                 fw1.write((long)datum[0] + ",");
-                                for (int i = 1; i < datum.length; i++)
-                                    fw1.write((float)datum[i] + ",");
+                                for (int i = 1; i < datum.length; i++) {
+                                    fw1.write((float)datum[i] + "");
+                                    if (i < datum.length - 1)
+                                        fw1.write(",");
+                                }
+                                fw1.write("\r\n");
 
                                 if (dataConsumer != null)
                                     dataConsumer.accept(datum);
@@ -393,8 +397,12 @@ public class CacheableData extends ArrayList<Object[]> {
                     }
                     
                     fw.write(row[0].toString() + ",");
-                    for (int j = 1; j < row.length; j++)
-                        fw.write(row[j].toString() + ",");
+                    for (int j = 1; j < row.length; j++) {
+                        fw.write((float)row[j] + "");
+                        if (j < row.length - 1)
+                            fw.write(",");
+                    }
+                    fw.write("\r\n");
                     
                     if (dataConsumer != null) {
                         dataConsumer.accept(row);
@@ -446,7 +454,9 @@ public class CacheableData extends ArrayList<Object[]> {
                 return 0;
             
             fis = new FileInputStream(f);
-            ByteBuffer buff = ByteBuffer.allocate(20).order(ByteOrder.LITTLE_ENDIAN);
+            ByteBuffer buff = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN);
+            fis.read(buff.array());
+            buff.position(0);
             int n = buff.getInt();
             int chunkSize = 8 + 4 * n;
             total = f.length() / chunkSize;
@@ -457,8 +467,8 @@ public class CacheableData extends ArrayList<Object[]> {
                 if (remaining < chunkSize) {
                     break;
                 }
-                fis.read(buff.array());
                 buff.position(0);
+                fis.read(buff.array());
                 Object[] tmp = new Object[n + 1];
                 long timestamp = buff.getLong();
                 
