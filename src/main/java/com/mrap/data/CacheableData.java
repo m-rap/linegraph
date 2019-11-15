@@ -446,53 +446,59 @@ public class CacheableData extends ArrayList<Object[]> {
     }
     
     public long loadCacheData(long from, long to, Consumer<Object[]> consumer) throws IOException {
-        FileInputStream fis;
         long total;
         synchronized (fileDumpLock) {
-            File f = new File(getCachePath());
-            if (!f.exists() || !f.canRead())
-                return 0;
-            
-            fis = new FileInputStream(f);
-            ByteBuffer buff = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN);
-            fis.read(buff.array());
-            buff.position(0);
-            int n = buff.getInt();
-            int chunkSize = 8 + 4 * n;
-            total = f.length() / chunkSize;
-            buff = ByteBuffer.allocate(chunkSize).order(ByteOrder.LITTLE_ENDIAN);
-            int remaining;
-            int count = 0;
-            while ((remaining = fis.available()) > 0) {
-                if (remaining < chunkSize) {
-                    break;
-                }
-                buff.position(0);
-                fis.read(buff.array());
-                Object[] tmp = new Object[n + 1];
-                long timestamp = buff.getLong();
-                
-                if (to != -1 && timestamp > to) {
-                    total -= ((fis.available() / chunkSize) - 1);
-                    break;
-                }
-                if (from != -1 && timestamp < from) {
-                    total--;
-                    continue;
-                }
-                
-                tmp[0] = timestamp;
-                for (int i = 0; i < n; i++)
-                    tmp[i + 1] = buff.getFloat();
-                
-                count++;
-                if (total <= 0)
-                    total = 1;
-                
-                consumer.accept(new Object[] {count, total, tmp});
-            }
-            fis.close();
+            total = loadCacheData(getCachePath(), from, to, consumer);
         }
+        return total;
+    }
+    
+    public static long loadCacheData(String cachePath, long from, long to, Consumer<Object[]> consumer) throws IOException {
+        FileInputStream fis;
+        long total;
+        File f = new File(cachePath);
+        if (!f.exists() || !f.canRead())
+            return 0;
+
+        fis = new FileInputStream(f);
+        ByteBuffer buff = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN);
+        fis.read(buff.array());
+        buff.position(0);
+        int n = buff.getInt();
+        int chunkSize = 8 + 4 * n;
+        total = f.length() / chunkSize;
+        buff = ByteBuffer.allocate(chunkSize).order(ByteOrder.LITTLE_ENDIAN);
+        int remaining;
+        int count = 0;
+        while ((remaining = fis.available()) > 0) {
+            if (remaining < chunkSize) {
+                break;
+            }
+            buff.position(0);
+            fis.read(buff.array());
+            Object[] tmp = new Object[n + 1];
+            long timestamp = buff.getLong();
+
+            if (to != -1 && timestamp > to) {
+                total -= ((fis.available() / chunkSize) - 1);
+                break;
+            }
+            if (from != -1 && timestamp < from) {
+                total--;
+                continue;
+            }
+
+            tmp[0] = timestamp;
+            for (int i = 0; i < n; i++)
+                tmp[i + 1] = buff.getFloat();
+
+            count++;
+            if (total <= 0)
+                total = 1;
+
+            consumer.accept(new Object[] {count, total, tmp});
+        }
+        fis.close();
         return total;
     }
     
