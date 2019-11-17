@@ -10,6 +10,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
@@ -71,28 +72,64 @@ public class CacheRead extends Application {
     VBox vbox;
     ArrayList<HBox> fields = new ArrayList<>();
     
-    class PpgWriter implements Consumer<Object[]> {
+    Consumer<Object[]> defaultConsumer = new Consumer<Object[]>() {
+        @Override
+        public void accept(Object[] t) {
+            Object[] tmp = (Object[])t[2];
+            int n = tmp.length;
+            System.out.print((int)t[0] + " " + (long)t[1] + " " + (long)tmp[0]);
+            for (int i = 1; i < n; i++) {
+                System.out.print(" " + (float)tmp[i]);
+            }
+            System.out.println();
+        }
+    };
+    
+    abstract class Dt2Writer implements Consumer<Object[]> {
+        
+        FileOutputStream fwData = null, fwIndex = null;
+        
+        public Dt2Writer(String prefix) throws IOException {
+            fwData = new FileOutputStream(prefix + ".dt2");
+            fwIndex = new FileOutputStream(prefix + ".ix2");
+            ByteBuffer buff = ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN);
+            buff.putInt(1);
+            fwIndex.write(buff.array());
+        }
+        
+        public void close() throws IOException {
+            if (fwData == null || fwIndex == null)
+                return;
+            fwData.flush();
+            fwData.close();
+            fwIndex.flush();
+            fwIndex.close();
+            fwData = null;
+            fwIndex = null;
+        }
+    }
+    
+    class PpgWriter extends Dt2Writer {
         int id;
         int ppgCount = 0;
         short[] ppgs = new short[25];
         long start = 0, end = 0;
         int counter = 0;
-        
-        FileOutputStream fwData = null, fwIndex = null;
-        
-        public PpgWriter(String prefix) throws IOException {
-            fwData = new FileOutputStream(prefix + ".dt2");
-            fwIndex = new FileOutputStream(prefix + ".ix2");
+        long dataStart = 0;
+        long lastTs = 0;
+
+        public PpgWriter(int id, String prefix) throws IOException {
+            super(prefix);
+            this.id = id;
         }
         
         byte[] composePpg() {
             byte[] buff = new byte[1 + 1 + 4 + 4 + 1 + ppgs.length * 2];
-            ByteBuffer buffer = ByteBuffer.wrap(buff);
+            ByteBuffer buffer = ByteBuffer.wrap(buff).order(ByteOrder.BIG_ENDIAN);
             buffer.put((byte)0xAA);
             buffer.put((byte)((id-1) & 0xFF));
             buffer.putInt((int)(start & 0xFFFFFFFFL));
             buffer.putInt((int)(end & 0xFFFFFFFFL));
-    //        System.out.println(counter);
             buffer.put((byte)(counter & 0xFF));
             counter = (counter + 1) % 6;
             for (int i = 0; i < ppgs.length; i++) {
@@ -110,30 +147,102 @@ public class CacheRead extends Application {
             int n = tmp.length;
             if (n < 1)
                 return;
-            if (ppgCount == 0)
-                start = (long)tmp[0];
-            else if (ppgCount == 24) {
-                end = (long)tmp[0];
+            ppgs[ppgCount] = (short)((float)tmp[1] * 10.0f);
+            long ts = (long)tmp[0];
+            if (ts < lastTs) {
                 try {
-                    fwData.write(composePpg());
+                    close();
+                    return;
                 } catch (IOException ex) {
                     Logger.getLogger(CacheRead.class.getName()).log(Level.SEVERE, null, ex);
                 }
             }
-            ppgs[ppgCount] = (short)((float)tmp[0] * 10.0f);
-            ppgCount++;
-//            System.out.print((int)t[0] + " " + (long)t[1] + " " + (long)tmp[0]);
-//            for (int i = 1; i < n; i++) {
-//                System.out.print(" " + (float)tmp[i]);
-//            }
-//            System.out.println();
+            lastTs = ts;
+            if (ppgCount == 0)
+                start = ts;
+            else if (ppgCount == 24) {
+                end = ts;
+                try {
+                    byte[] data = composePpg();
+                    fwData.write(data);
+                    ByteBuffer indexBuff = ByteBuffer.allocate(6).order(ByteOrder.LITTLE_ENDIAN);
+                    indexBuff.putInt((int)(start & 0xFFFFFFFF));
+                    indexBuff.putShort((short)(data.length & 0xFFFF));
+                    fwIndex.write(indexBuff.array());
+                    System.out.println("write ppg " + start + " " + end + " " + (end-start) + " " + data.length + " " + fwData.getChannel().position() + " " + (long)t[3]);
+                } catch (IOException ex) {
+                    Logger.getLogger(CacheRead.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+            ppgCount = (ppgCount + 1) % 25;
         }
+    }
+    
+    class HrWriter extends Dt2Writer {
+        int id;
+        long lastTs = 0;
+
+        public HrWriter(int id, String prefix) throws IOException {
+            super(prefix);
+            this.id = id;
+        }
+        
+        byte[] composeHr(int id, int spo2, int hr, int avg, long ts) {
+            byte[] buff = new byte[1 + 1 + 4 + 3 * 2];
+            ByteBuffer buffer = ByteBuffer.wrap(buff);
+            buffer.put((byte)0xBB);
+            buffer.put((byte)((id-1) & 0xFF));
+            buffer.putInt((int)(ts & 0xFFFFFFFFL));
+            buffer.putShort((short)spo2);
+            buffer.putShort((short)hr);
+            buffer.putShort((short)avg);
+            return buff;
+        }
+
+        @Override
+        public void accept(Object[] t) {
+            if (fwData == null || fwIndex == null)
+                return;
+            
+            Object[] tmp = (Object[])t[2];
+            int n = tmp.length;
+            if (n < 1)
+                return;
+            short[] datashort = new short[3];
+            for (int i = 0; i < n-1; i++)
+                datashort[i] = (short)((float)tmp[i + 1] * 10.0f);
+            try {
+                long ts = (long)tmp[0];
+                if (ts < lastTs) {
+                    try {
+                        close();
+                        return;
+                    } catch (IOException ex) {
+                        Logger.getLogger(CacheRead.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                }
+                lastTs = ts;
+                byte[] data = composeHr(id, datashort[0], datashort[1], datashort[2], ts);
+                fwData.write(data);
+                ByteBuffer indexBuff = ByteBuffer.allocate(6).order(ByteOrder.LITTLE_ENDIAN);
+                indexBuff.putInt((int)(ts & 0xFFFFFFFF));
+                indexBuff.putShort((short)(data.length & 0xFFFF));
+                fwIndex.write(indexBuff.array());
+                System.out.println("write hr " + ts + " " + data.length + " " + (long)t[3]);
+            } catch (IOException ex) {
+                Logger.getLogger(CacheRead.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+        
     }
     
     HBox createField() {
         TextField t = new TextField();
+        TextField t2 = new TextField();
+        TextField t3 = new TextField();
+        TextField t4 = new TextField();
         HBox.setHgrow(t, Priority.ALWAYS);
-        HBox hbox = new HBox(t);
+        HBox hbox = new HBox(t, t2, t3, t4);
         hbox.setOnDragOver(new EventHandler<DragEvent>() {
             @Override
             public void handle(DragEvent event) {
@@ -176,32 +285,43 @@ public class CacheRead extends Application {
         startBtn.setOnAction(new EventHandler<ActionEvent>() {
             @Override
             public void handle(ActionEvent event) {
-                ArrayList<File> files = new ArrayList<>();
+                ArrayList<Object[]> items = new ArrayList<>();
                 for (HBox hbox : fields) {
                     File f = new File(((TextField)hbox.getChildren().get(0)).getText());
                     if (f.exists() && f.isFile()) {
-                        files.add(f);
+                        Consumer<Object[]> consumer = defaultConsumer;
+                        String type = ((TextField)hbox.getChildren().get(1)).getText();
+                        try {
+                            if (type.equals("ppg")) {
+                                consumer = new PpgWriter(1, ((TextField)hbox.getChildren().get(2)).getText());
+                            } else if (type.equals("hr")) {
+                                consumer = new HrWriter(1, ((TextField)hbox.getChildren().get(2)).getText());
+                            }
+                        } catch (IOException ex) {
+                            Logger.getLogger(CacheRead.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+                        String jumpToByte = ((TextField)hbox.getChildren().get(3)).getText();
+                        long jumpToByteL = -1;
+                        try {
+                            jumpToByteL = Long.parseLong(jumpToByte);
+                        } catch (NumberFormatException ex) {}
+                        items.add(new Object[]{f, consumer, jumpToByteL});
                     }
                 }
-                ExecutorService es = Executors.newFixedThreadPool(files.size());
+                ExecutorService es = Executors.newFixedThreadPool(items.size());
                 ArrayList<Callable<Integer>> callables = new ArrayList<>();
-                for (File f : files) {
+                for (Object[] objs : items) {
+                    File f = (File)objs[0];
                     callables.add(new Callable<Integer>() {
                         @Override
                         public Integer call() throws Exception {
                             try {
-                                CacheableData.loadCacheData(f.getPath(), -1, -1, new Consumer<Object[]>() {
-                                    @Override
-                                    public void accept(Object[] t) {
-                                        Object[] tmp = (Object[])t[2];
-                                        int n = tmp.length;
-                                        System.out.print((int)t[0] + " " + (long)t[1] + " " + (long)tmp[0]);
-                                        for (int i = 1; i < n; i++) {
-                                            System.out.print(" " + (float)tmp[i]);
-                                        }
-                                        System.out.println();
-                                    }
-                                });
+                                Consumer<Object[]> cons = (Consumer<Object[]>)objs[1];
+                                CacheableData.loadCacheData(f.getPath(), -1, -1, (long)objs[2], cons);
+                                if (cons instanceof Dt2Writer) {
+                                    ((Dt2Writer)cons).close();
+                                    System.out.println("dt2 finished");
+                                }
                             } catch (IOException ex) {
                                 Logger.getLogger(CacheRead.class.getName()).log(Level.SEVERE, null, ex);
                                 return -1;
@@ -219,6 +339,7 @@ public class CacheRead extends Application {
                             Logger.getLogger(CacheRead.class.getName()).log(Level.SEVERE, null, ex);
                         }
                     }
+                    es.shutdown();
                 } catch (InterruptedException ex) {
                     Logger.getLogger(CacheRead.class.getName()).log(Level.SEVERE, null, ex);
                 }

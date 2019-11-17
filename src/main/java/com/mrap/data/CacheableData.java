@@ -448,12 +448,12 @@ public class CacheableData extends ArrayList<Object[]> {
     public long loadCacheData(long from, long to, Consumer<Object[]> consumer) throws IOException {
         long total;
         synchronized (fileDumpLock) {
-            total = loadCacheData(getCachePath(), from, to, consumer);
+            total = loadCacheData(getCachePath(), from, to, -1, consumer);
         }
         return total;
     }
     
-    public static long loadCacheData(String cachePath, long from, long to, Consumer<Object[]> consumer) throws IOException {
+    public static long loadCacheData(String cachePath, long from, long to, long jumpToByte, Consumer<Object[]> consumer) throws IOException {
         FileInputStream fis;
         long total;
         File f = new File(cachePath);
@@ -470,6 +470,9 @@ public class CacheableData extends ArrayList<Object[]> {
         buff = ByteBuffer.allocate(chunkSize).order(ByteOrder.LITTLE_ENDIAN);
         int remaining;
         int count = 0;
+        if (jumpToByte != -1) {
+            fis.getChannel().position(jumpToByte);
+        }
         while ((remaining = fis.available()) > 0) {
             if (remaining < chunkSize) {
                 break;
@@ -496,7 +499,7 @@ public class CacheableData extends ArrayList<Object[]> {
             if (total <= 0)
                 total = 1;
 
-            consumer.accept(new Object[] {count, total, tmp});
+            consumer.accept(new Object[] {count, total, tmp, fis.getChannel().position()});
         }
         fis.close();
         return total;
